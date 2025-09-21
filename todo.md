@@ -64,7 +64,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Basic popup.css
 
 ### 2.3 Current Tab URL Capture
-- [ ] **Task:** Implement current tab URL capture functionality
+- [x] **Task:** Implement current tab URL capture functionality
   - **Details:**
     - Use chrome.tabs API to get active tab
     - Extract URL and title
@@ -74,7 +74,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Working URL capture in popup.js
 
 ### 2.4 In-Memory URL Display
-- [ ] **Task:** Display captured URLs in popup (in-memory only)
+- [x] **Task:** Display captured URLs in popup (in-memory only)
   - **Details:**
     - Simple list display
     - Show URL and title
