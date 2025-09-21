@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FavURL - Bookmark Manager</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="header-title">FavURL</h1>
+            <p class="header-subtitle">Bookmark Manager</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Search Section (placeholder for future implementation) -->
+            <section class="search-section" style="display: none;">
+                <input type="text" class="search-input" placeholder="Search bookmarks..." aria-label="Search bookmarks">
+                <button class="search-clear" aria-label="Clear search">×</button>
+            </section>
+
+            <!-- Action Buttons -->
+            <section class="action-section">
+                <button class="btn btn-primary add-current-url" aria-label="Save current tab URL">
+                    Save Current Tab
+                </button>
+                <button class="btn btn-secondary add-manual-url" aria-label="Add URL manually" style="display: none;">
+                    Add URL
+                </button>
+            </section>
+
+            <!-- Groups Filter (placeholder for future implementation) -->
+            <section class="filter-section" style="display: none;">
+                <select class="group-filter" aria-label="Filter by group">
+                    <option value="all">All Groups</option>
+                    <option value="ungrouped">Ungrouped</option>
+                </select>
+            </section>
+
+            <!-- URL List Container -->
+            <section class="url-list-section">
+                <div class="url-list" id="urlList" role="list" aria-label="Saved bookmarks">
+                    <!-- URLs will be dynamically inserted here -->
+                    <div class="empty-state" id="emptyState">
+                        <p>No bookmarks saved yet</p>
+                        <p class="empty-state-subtitle">Click "Save Current Tab" to get started</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer (placeholder for future features) -->
+        <footer class="footer" style="display: none;">
+            <button class="btn btn-tertiary export-btn" aria-label="Export bookmarks">Export</button>
+            <button class="btn btn-tertiary import-btn" aria-label="Import bookmarks">Import</button>
+        </footer>
+    </div>
+
+    <!-- Modals (placeholders for future implementation) -->
+    <div class="modal-overlay" id="modalOverlay" style="display: none;" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Modal Title</h2>
+                <button class="modal-close" aria-label="Close modal">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Modal content will be dynamically inserted here -->
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <!-- Modal buttons will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner (placeholder for future implementation) -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;" aria-hidden="true">
+        <div class="loading-spinner" aria-label="Loading"></div>
+        <p class="loading-text">Loading...</p>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

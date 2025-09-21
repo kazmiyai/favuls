@@ -43,7 +43,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
 **Goal:** Minimum viable product - save and display current tab URL
 
 ### 2.1 Basic HTML Structure
-- [ ] **Task:** Create popup.html with basic layout
+- [x] **Task:** Create popup.html with basic layout
   - **Details:**
     - Popup dimensions: 400px × 600px
     - Basic header with extension title
@@ -54,7 +54,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Basic popup.html
 
 ### 2.2 Basic CSS
-- [ ] **Task:** Create popup.css with modern styling
+- [x] **Task:** Create popup.css with modern styling
   - **Details:**
     - Modern business interface design
     - Basic layout and typography
