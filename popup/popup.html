@@ -27,8 +27,11 @@
                 <button class="btn btn-primary add-current-url" aria-label="Save current tab URL">
                     Save Current Tab
                 </button>
-                <button class="btn btn-secondary add-manual-url" aria-label="Add URL manually" style="display: none;">
+                <button class="btn btn-secondary add-manual-url" aria-label="Add URL manually">
                     Add URL
+                </button>
+                <button class="btn btn-tertiary create-group-btn" aria-label="Create new group">
+                    Create Group
                 </button>
             </section>
 
@@ -59,7 +62,7 @@
         </footer>
     </div>
 
-    <!-- Modals (placeholders for future implementation) -->
+    <!-- Modals -->
     <div class="modal-overlay" id="modalOverlay" style="display: none;" aria-hidden="true">
         <div class="modal" role="dialog" aria-modal="true">
             <div class="modal-header">
@@ -74,6 +77,156 @@
             </div>
         </div>
     </div>
+
+    <!-- Group Creation Modal Template (hidden) -->
+    <template id="createGroupModalTemplate">
+        <form class="create-group-form" id="createGroupForm">
+            <div class="form-group">
+                <label class="form-label" for="groupName">Group Name</label>
+                <input type="text"
+                       class="form-input"
+                       id="groupName"
+                       name="groupName"
+                       placeholder="Enter group name"
+                       maxlength="50"
+                       required
+                       aria-describedby="groupNameHelp">
+                <div class="form-help" id="groupNameHelp">Maximum 50 characters</div>
+                <div class="form-error" id="groupNameError" role="alert" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="groupColor">Group Color</label>
+                <div class="color-picker-container">
+                    <input type="color"
+                           class="form-color-input"
+                           id="groupColor"
+                           name="groupColor"
+                           value="#2196f3"
+                           aria-label="Choose group color">
+                    <div class="color-preview" id="colorPreview"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="groupDescription">Description (Optional)</label>
+                <textarea class="form-input form-textarea"
+                          id="groupDescription"
+                          name="groupDescription"
+                          placeholder="Brief description of this group"
+                          maxlength="200"
+                          rows="3"></textarea>
+                <div class="form-help">Maximum 200 characters</div>
+            </div>
+        </form>
+    </template>
+
+    <!-- Group Creation Modal Footer Template (hidden) -->
+    <template id="createGroupModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="cancelCreateGroup">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="createGroupForm" id="saveCreateGroup">Create Group</button>
+    </template>
+
+    <!-- Add URL Modal Template (hidden) -->
+    <template id="addURLModalTemplate">
+        <form class="add-url-form" id="addURLForm">
+            <div class="form-group">
+                <label class="form-label" for="urlAddress">URL</label>
+                <input type="url"
+                       class="form-input"
+                       id="urlAddress"
+                       name="urlAddress"
+                       placeholder="https://example.com"
+                       required
+                       aria-describedby="urlAddressHelp">
+                <div class="form-help" id="urlAddressHelp">Enter the complete URL including https://</div>
+                <div class="form-error" id="urlAddressError" role="alert" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="urlTitle">Title</label>
+                <input type="text"
+                       class="form-input"
+                       id="urlTitle"
+                       name="urlTitle"
+                       placeholder="Page title"
+                       maxlength="200"
+                       required
+                       aria-describedby="urlTitleHelp">
+                <div class="form-help" id="urlTitleHelp">Maximum 200 characters</div>
+                <div class="form-error" id="urlTitleError" role="alert" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="urlGroup">Group</label>
+                <select class="form-select"
+                        id="urlGroup"
+                        name="urlGroup"
+                        aria-label="Select group for this URL">
+                    <!-- Groups will be populated dynamically -->
+                </select>
+                <div class="form-help">Choose which group to save this URL to</div>
+            </div>
+        </form>
+    </template>
+
+    <!-- Add URL Modal Footer Template (hidden) -->
+    <template id="addURLModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="cancelAddURL">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="addURLForm" id="saveAddURL">Save URL</button>
+    </template>
+
+    <!-- Edit URL Modal Template (hidden) -->
+    <template id="editURLModalTemplate">
+        <form class="edit-url-form" id="editURLForm">
+            <div class="form-group">
+                <label class="form-label" for="editUrlAddress">URL</label>
+                <input type="url"
+                       class="form-input"
+                       id="editUrlAddress"
+                       name="editUrlAddress"
+                       placeholder="https://example.com"
+                       required
+                       aria-describedby="editUrlAddressHelp">
+                <div class="form-help" id="editUrlAddressHelp">Enter the complete URL including https://</div>
+                <div class="form-error" id="editUrlAddressError" role="alert" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="editUrlTitle">Title</label>
+                <input type="text"
+                       class="form-input"
+                       id="editUrlTitle"
+                       name="editUrlTitle"
+                       placeholder="Page title"
+                       maxlength="200"
+                       required
+                       aria-describedby="editUrlTitleHelp">
+                <div class="form-help" id="editUrlTitleHelp">Maximum 200 characters</div>
+                <div class="form-error" id="editUrlTitleError" role="alert" aria-live="polite"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="editUrlGroup">Group</label>
+                <select class="form-select"
+                        id="editUrlGroup"
+                        name="editUrlGroup"
+                        aria-label="Select group for this URL">
+                    <!-- Groups will be populated dynamically -->
+                </select>
+                <div class="form-help">Choose which group this URL belongs to</div>
+            </div>
+
+            <input type="hidden" id="editUrlId" name="editUrlId" value="">
+        </form>
+    </template>
+
+    <!-- Edit URL Modal Footer Template (hidden) -->
+    <template id="editURLModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="cancelEditURL">Cancel</button>
+        <button type="button" class="btn btn-tertiary" id="deleteEditURL">Delete</button>
+        <button type="submit" class="btn btn-primary" form="editURLForm" id="saveEditURL">Save Changes</button>
+    </template>
 
     <!-- Loading Spinner (placeholder for future implementation) -->
     <div class="loading-overlay" id="loadingOverlay" style="display: none;" aria-hidden="true">
