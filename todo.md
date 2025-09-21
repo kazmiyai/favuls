@@ -125,7 +125,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
 **Goal:** Organize URLs into custom groups
 
 ### 4.1 Group Creation
-- [ ] **Task:** Implement group creation functionality
+- [x] **Task:** Implement group creation functionality
   - **Details:**
     - Add group button/modal
     - Group name input and validation
@@ -136,7 +136,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Group creation feature
 
 ### 4.2 Group Display
-- [ ] **Task:** Display URLs organized by groups
+- [x] **Task:** Display URLs organized by groups
   - **Details:**
     - Group headers
     - URLs listed under respective groups
@@ -146,7 +146,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Grouped URL display
 
 ### 4.3 URL Group Assignment
-- [ ] **Task:** Assign URLs to groups
+- [x] **Task:** Assign URLs to groups
   - **Details:**
     - Group selection dropdown in add/edit URL
     - Move URLs between groups

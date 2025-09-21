@@ -100,6 +100,7 @@ body {
     margin-bottom: 16px;
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* Buttons */
@@ -151,11 +152,15 @@ body {
     border: 1px solid #667eea;
     padding: 8px 12px;
     font-size: 12px;
+    min-width: auto;
+    flex: 0 0 auto;
 }
 
 .btn-tertiary:hover {
     background-color: #667eea;
     color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
 }
 
 /* Filter Section */
@@ -335,28 +340,103 @@ body {
     color: #999;
 }
 
-/* Group Headers (for future implementation) */
+/* Group Headers (Task 4.2: Enhanced with collapsible functionality) */
 .group-header {
+    display: block;
+    padding: 12px 8px;
+    margin: 8px 0 0 0;
+    border: 1px solid #e9ecef;
+    border-radius: 8px 8px 0 0;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.group-header:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+    border-color: #667eea;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.group-header:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.group-header-content {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    margin: 16px 0 8px 0;
-    border-bottom: 1px solid #e9ecef;
+    gap: 8px;
+}
+
+.group-chevron {
+    font-size: 12px;
+    color: #666;
+    transition: transform 0.2s ease;
+    width: 16px;
+    text-align: center;
+}
+
+.group-name {
     font-weight: 600;
-    font-size: 13px;
-    color: #495057;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 14px;
+    flex: 1;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .group-count {
     font-size: 11px;
     color: #666;
-    font-weight: normal;
-    background-color: #f8f9fa;
-    padding: 2px 6px;
-    border-radius: 10px;
+    font-weight: 500;
+    background-color: #f0f2ff;
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid #e0e6ff;
+}
+
+/* Group Containers (Task 4.2: Collapsible sections) */
+.group-container {
+    border: 1px solid #e9ecef;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.group-container.group-expanded {
+    max-height: none;
+    opacity: 1;
+}
+
+.group-container.group-collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: 8px;
+    border-bottom: none;
+}
+
+/* Group Container URL Items */
+.group-container .url-item {
+    margin-bottom: 0;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.group-container .url-item:last-child {
+    border-bottom: none;
+}
+
+.group-container .url-item:hover {
+    border-color: #f0f0f0;
+    border-bottom-color: #f0f0f0;
+    transform: none;
+    box-shadow: inset 0 0 0 1px #667eea;
 }
 
 /* Footer */
@@ -436,14 +516,14 @@ body {
     justify-content: flex-end;
 }
 
-/* Form Styles (for future modals) */
+/* Form Styles */
 .form-group {
     margin-bottom: 16px;
 }
 
 .form-label {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     font-weight: 500;
     color: #333;
     font-size: 13px;
@@ -455,13 +535,25 @@ body {
     border: 1px solid #dee2e6;
     border-radius: 6px;
     font-size: 14px;
-    transition: border-color 0.2s ease;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 .form-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-input[aria-invalid="true"] {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.form-textarea {
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
 }
 
 .form-select {
@@ -478,6 +570,126 @@ body {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-help {
+    font-size: 11px;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+.form-error {
+    font-size: 12px;
+    color: #dc3545;
+    margin-top: 4px;
+    font-weight: 500;
+    min-height: 16px;
+}
+
+/* Group Creation Modal Specific Styles */
+.create-group-form {
+    max-width: none;
+}
+
+.color-picker-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.form-color-input {
+    width: 50px;
+    height: 40px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+    transition: all 0.2s ease;
+}
+
+.form-color-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.color-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #e9ecef;
+    background-color: #2196f3;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+/* Group Creation Form Layout */
+.create-group-form .form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Drag and Drop Visual Feedback (Task 4.3) */
+.url-item.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    border-color: #667eea;
+    cursor: grabbing;
+}
+
+.group-header.drag-over {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+.group-header.drag-over .group-name {
+    color: white !important;
+}
+
+.group-header.drag-over .group-count {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.group-header.drag-over .group-chevron {
+    color: white;
+}
+
+/* URL Item Drag States */
+.url-item[draggable="true"] {
+    cursor: grab;
+}
+
+.url-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Drag Helper Styles */
+.url-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.url-item.dragging::before {
+    background: linear-gradient(45deg, rgba(102, 126, 234, 0.1) 25%, transparent 25%),
+                linear-gradient(-45deg, rgba(102, 126, 234, 0.1) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, rgba(102, 126, 234, 0.1) 75%),
+                linear-gradient(-45deg, transparent 75%, rgba(102, 126, 234, 0.1) 75%);
+    background-size: 10px 10px;
+    background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
 }
 
 /* Loading Styles */

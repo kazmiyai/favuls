@@ -20,7 +20,7 @@ class URLDataModel {
     }
 
     generateUniqueId() {
-        return 'url_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+        return 'url_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
     }
 
     extractDomain(url) {
@@ -102,7 +102,7 @@ class GroupDataModel {
     }
 
     generateUniqueId() {
-        return 'group_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+        return 'group_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
     }
 
     validate() {
@@ -167,6 +167,8 @@ class BookmarkManager {
         // Task 3.3: Data validation and integrity
         this.dataModelVersion = '1.0';
         this.lastDataValidation = null;
+        // Task 4.2: Group display state management
+        this.groupExpandedState = {}; // Track which groups are expanded/collapsed
         this.init();
     }
 
@@ -175,6 +177,7 @@ class BookmarkManager {
         this.initializeDefaultGroup();
 
         await this.loadData();
+        await this.loadGroupExpandedState();
         await this.updateStorageQuota();
 
         this.setupEventListeners();
@@ -299,6 +302,46 @@ class BookmarkManager {
             saveCurrentBtn.addEventListener('click', () => this.captureCurrentTab());
         }
 
+        // Create Group button
+        const createGroupBtn = document.querySelector('.create-group-btn');
+        if (createGroupBtn) {
+            createGroupBtn.addEventListener('click', () => this.openCreateGroupModal());
+        }
+
+        // Add URL button
+        const addURLBtn = document.querySelector('.add-manual-url');
+        if (addURLBtn) {
+            addURLBtn.addEventListener('click', () => this.openAddURLModal());
+        }
+
+        // Modal close button
+        const modalClose = document.querySelector('.modal-close');
+        if (modalClose) {
+            modalClose.addEventListener('click', () => this.closeModal());
+        }
+
+        // Modal overlay click to close
+        const modalOverlay = document.getElementById('modalOverlay');
+        if (modalOverlay) {
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    this.closeModal();
+                }
+            });
+        }
+
+        // Keyboard navigation for modal and groups
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isModalOpen()) {
+                this.closeModal();
+            }
+
+            // Group navigation with arrow keys
+            if (e.target.classList.contains('group-header')) {
+                this.handleGroupHeaderKeyNavigation(e);
+            }
+        });
+
         // URL list click handler for opening URLs
         const urlList = document.getElementById('urlList');
         if (urlList) {
@@ -382,7 +425,7 @@ class BookmarkManager {
 
     // Generate unique ID
     generateUniqueId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
     }
 
     // Get default group ID (Task 3.2: Default assignment for new URLs)
@@ -496,7 +539,7 @@ class BookmarkManager {
         return true;
     }
 
-    // URL List Rendering
+    // URL List Rendering (Task 4.2: Enhanced group display)
     renderURLs() {
         const urlList = document.getElementById('urlList');
         const emptyState = document.getElementById('emptyState');
@@ -520,21 +563,33 @@ class BookmarkManager {
         // Group URLs by groupId
         const groupedURLs = this.groupURLsByGroup();
 
+        // Sort groups to show ungrouped first, then others alphabetically
+        const sortedGroupIds = Object.keys(groupedURLs).sort((a, b) => {
+            if (a === 'ungrouped') return -1;
+            if (b === 'ungrouped') return 1;
+            const groupA = this.groups.find(g => g.id === a);
+            const groupB = this.groups.find(g => g.id === b);
+            const nameA = groupA ? groupA.name : 'Unknown';
+            const nameB = groupB ? groupB.name : 'Unknown';
+            return nameA.localeCompare(nameB);
+        });
+
         // Render each group
-        Object.entries(groupedURLs).forEach(([groupId, urls]) => {
-            const group = this.groups.find(g => g.id === groupId) || { id: groupId, name: 'Unknown Group' };
+        sortedGroupIds.forEach(groupId => {
+            const urls = groupedURLs[groupId];
+            const group = this.groups.find(g => g.id === groupId) || {
+                id: groupId,
+                name: 'Unknown Group',
+                color: '#6c757d'
+            };
 
-            // Create group header (for future implementation)
-            if (Object.keys(groupedURLs).length > 1) {
-                const groupHeader = this.createGroupHeader(group, urls.length);
-                urlList.appendChild(groupHeader);
-            }
+            // Always create group header now (Task 4.2: Group headers)
+            const groupHeader = this.createGroupHeader(group, urls.length);
+            urlList.appendChild(groupHeader);
 
-            // Render URLs in this group
-            urls.forEach(url => {
-                const urlElement = this.createURLElement(url);
-                urlList.appendChild(urlElement);
-            });
+            // Create group container for URLs
+            const groupContainer = this.createGroupContainer(groupId, urls);
+            urlList.appendChild(groupContainer);
         });
     }
 
@@ -553,11 +608,74 @@ class BookmarkManager {
     createGroupHeader(group, count) {
         const header = document.createElement('div');
         header.className = 'group-header';
+        header.setAttribute('id', `group-header-${group.id}`);
+        header.setAttribute('data-group-id', group.id);
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('aria-expanded', this.isGroupExpanded(group.id).toString());
+        header.setAttribute('aria-label', `Toggle ${group.name} group with ${count} bookmark${count !== 1 ? 's' : ''}`);
+
+        const isExpanded = this.isGroupExpanded(group.id);
+        const chevronIcon = isExpanded ? '▼' : '▶';
+
         header.innerHTML = `
-            <span>${group.name}</span>
-            <span class="group-count">${count}</span>
+            <div class="group-header-content">
+                <span class="group-chevron" aria-hidden="true">${chevronIcon}</span>
+                <span class="group-name" style="color: ${group.color || '#2196f3'}">${this.escapeHtml(group.name)}</span>
+                <span class="group-count">${count}</span>
+            </div>
         `;
+
+        // Add click handler for expand/collapse
+        header.addEventListener('click', () => {
+            this.toggleGroupExpanded(group.id);
+        });
+
+        // Add keyboard handler
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.toggleGroupExpanded(group.id);
+            }
+        });
+
+        // Task 4.3: Add drag-and-drop support for group headers
+        header.addEventListener('dragover', (e) => {
+            this.handleGroupDragOver(e, group.id);
+        });
+
+        header.addEventListener('drop', (e) => {
+            this.handleGroupDrop(e, group.id);
+        });
+
+        header.addEventListener('dragenter', (e) => {
+            this.handleGroupDragEnter(e, group.id);
+        });
+
+        header.addEventListener('dragleave', (e) => {
+            this.handleGroupDragLeave(e);
+        });
+
         return header;
+    }
+
+    createGroupContainer(groupId, urls) {
+        const container = document.createElement('div');
+        container.className = 'group-container';
+        container.setAttribute('data-group-container-id', groupId);
+        container.setAttribute('role', 'group');
+        container.setAttribute('aria-labelledby', `group-header-${groupId}`);
+
+        const isExpanded = this.isGroupExpanded(groupId);
+        container.classList.add(isExpanded ? 'group-expanded' : 'group-collapsed');
+
+        // Add URLs to container
+        urls.forEach(url => {
+            const urlElement = this.createURLElement(url);
+            container.appendChild(urlElement);
+        });
+
+        return container;
     }
 
     createURLElement(urlData) {
@@ -567,6 +685,10 @@ class BookmarkManager {
         urlElement.setAttribute('tabindex', '0');
         urlElement.setAttribute('role', 'listitem');
         urlElement.setAttribute('aria-label', `Bookmark: ${urlData.title}`);
+
+        // Task 4.3: Make URLs draggable for group assignment
+        urlElement.setAttribute('draggable', 'true');
+        urlElement.setAttribute('data-group-id', urlData.groupId);
 
         // Task 2.4: Simple list display with URL and title
         // Get domain for favicon
@@ -608,6 +730,15 @@ class BookmarkManager {
                     this.openURL(urlData.url);
                 }
             }
+        });
+
+        // Task 4.3: Add drag-and-drop event listeners
+        urlElement.addEventListener('dragstart', (e) => {
+            this.handleURLDragStart(e, urlData);
+        });
+
+        urlElement.addEventListener('dragend', (e) => {
+            this.handleURLDragEnd(e);
         });
 
         return urlElement;
@@ -668,15 +799,819 @@ class BookmarkManager {
         return movedCount;
     }
 
-    // Placeholder methods for future implementation
+    // Modal System Methods (Task 4.1: Group Creation)
+    isModalOpen() {
+        const modal = document.getElementById('modalOverlay');
+        return modal && modal.style.display !== 'none';
+    }
+
+    openModal(title, bodyContent, footerContent) {
+        const modal = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalFooter = document.getElementById('modalFooter');
+
+        if (!modal || !modalTitle || !modalBody || !modalFooter) {
+            console.error('Modal elements not found');
+            return;
+        }
+
+        modalTitle.textContent = title;
+        modalBody.innerHTML = '';
+        modalFooter.innerHTML = '';
+
+        if (bodyContent) {
+            modalBody.appendChild(bodyContent);
+        }
+
+        if (footerContent) {
+            modalFooter.appendChild(footerContent);
+        }
+
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+
+        // Focus on first focusable element
+        const firstFocusable = modal.querySelector('input, button, select, textarea');
+        if (firstFocusable) {
+            setTimeout(() => firstFocusable.focus(), 100);
+        }
+    }
+
+    closeModal() {
+        const modal = document.getElementById('modalOverlay');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    // Group Creation Methods (Task 4.1)
+    openCreateGroupModal() {
+        try {
+            // Check group limit before opening modal
+            if (this.groups.length >= 50) {
+                this.showError('Maximum number of groups (50) reached. Please delete a group before creating a new one.');
+                return;
+            }
+
+            // Clone template content
+            const template = document.getElementById('createGroupModalTemplate');
+            const footerTemplate = document.getElementById('createGroupModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Group creation modal templates not found');
+                return;
+            }
+
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Set up event listeners for the form
+            this.setupGroupModalEventListeners(modalBody, modalFooter);
+
+            // Open modal
+            this.openModal('Create New Group', modalBody, modalFooter);
+
+        } catch (error) {
+            console.error('Error opening create group modal:', error);
+            this.showError('Failed to open group creation dialog');
+        }
+    }
+
+    setupGroupModalEventListeners(modalBody, modalFooter) {
+        // Handle form submission
+        const form = modalBody.querySelector('#createGroupForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleCreateGroup(form);
+            });
+        }
+
+        // Handle cancel button
+        const cancelBtn = modalFooter.querySelector('#cancelCreateGroup');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Handle color picker preview
+        const colorInput = modalBody.querySelector('#groupColor');
+        const colorPreview = modalBody.querySelector('#colorPreview');
+        if (colorInput && colorPreview) {
+            const updatePreview = () => {
+                colorPreview.style.backgroundColor = colorInput.value;
+            };
+            colorInput.addEventListener('input', updatePreview);
+            updatePreview(); // Initial preview
+        }
+
+        // Handle real-time validation
+        const nameInput = modalBody.querySelector('#groupName');
+        if (nameInput) {
+            nameInput.addEventListener('input', () => this.validateGroupName(nameInput));
+            nameInput.addEventListener('blur', () => this.validateGroupName(nameInput));
+        }
+    }
+
+    validateGroupName(nameInput) {
+        const name = nameInput.value.trim();
+        const errorElement = document.getElementById('groupNameError');
+
+        if (!errorElement) return true;
+
+        let errorMessage = '';
+
+        if (!name) {
+            errorMessage = 'Group name is required';
+        } else if (name.length > 50) {
+            errorMessage = 'Group name must be 50 characters or less';
+        } else if (this.groups.some(g => g.name.toLowerCase() === name.toLowerCase())) {
+            errorMessage = 'A group with this name already exists';
+        }
+
+        errorElement.textContent = errorMessage;
+        nameInput.setAttribute('aria-invalid', errorMessage ? 'true' : 'false');
+
+        return !errorMessage;
+    }
+
+    async handleCreateGroup(form) {
+        try {
+            this.showLoading('Creating group...');
+
+            // Get form data
+            const formData = new FormData(form);
+            const groupName = formData.get('groupName').trim();
+            const groupColor = formData.get('groupColor');
+            const groupDescription = formData.get('groupDescription').trim();
+
+            // Validate group name
+            const nameInput = form.querySelector('#groupName');
+            if (!this.validateGroupName(nameInput)) {
+                this.hideLoading();
+                return;
+            }
+
+            // Check group limit
+            if (this.groups.length >= 50) {
+                throw new Error('Maximum number of groups (50) reached');
+            }
+
+            // Create new group using data model
+            const newGroup = new GroupDataModel({
+                name: groupName,
+                color: groupColor,
+                description: groupDescription
+            });
+
+            // Validate the new group
+            const validation = newGroup.validate();
+            if (!validation.isValid) {
+                throw new Error(`Invalid group data: ${validation.errors.join(', ')}`);
+            }
+
+            // Add to groups array
+            this.groups.push(newGroup);
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Close modal and show success
+            this.closeModal();
+            this.showMessage(`Group "${groupName}" created successfully!`);
+
+            this.hideLoading();
+
+        } catch (error) {
+            console.error('Error creating group:', error);
+            this.showError(error.message || 'Failed to create group');
+            this.hideLoading();
+        }
+    }
+
+    // Group Management Utility Methods
+    getGroupById(groupId) {
+        return this.groups.find(g => g.id === groupId);
+    }
+
+    getGroupByName(name) {
+        return this.groups.find(g => g.name.toLowerCase() === name.toLowerCase());
+    }
+
+    canCreateMoreGroups() {
+        return this.groups.length < 50;
+    }
+
+    // URL Management Methods (Task 4.3: URL Group Assignment)
+    openAddURLModal() {
+        try {
+            // Clone template content
+            const template = document.getElementById('addURLModalTemplate');
+            const footerTemplate = document.getElementById('addURLModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Add URL modal templates not found');
+                return;
+            }
+
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Populate groups dropdown
+            this.populateGroupSelect(modalBody.querySelector('#urlGroup'));
+
+            // Set up event listeners for the form
+            this.setupAddURLModalEventListeners(modalBody, modalFooter);
+
+            // Open modal
+            this.openModal('Add New URL', modalBody, modalFooter);
+
+        } catch (error) {
+            console.error('Error opening add URL modal:', error);
+            this.showError('Failed to open add URL dialog');
+        }
+    }
+
+    openEditURLModal(urlId) {
+        try {
+            const url = this.urls.find(u => u.id === urlId);
+            if (!url) {
+                console.error('URL not found:', urlId);
+                return;
+            }
+
+            // Clone template content
+            const template = document.getElementById('editURLModalTemplate');
+            const footerTemplate = document.getElementById('editURLModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Edit URL modal templates not found');
+                return;
+            }
+
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Populate form with existing data
+            modalBody.querySelector('#editUrlAddress').value = url.url;
+            modalBody.querySelector('#editUrlTitle').value = url.title;
+            modalBody.querySelector('#editUrlId').value = url.id;
+
+            // Populate groups dropdown
+            this.populateGroupSelect(modalBody.querySelector('#editUrlGroup'), url.groupId);
+
+            // Set up event listeners for the form
+            this.setupEditURLModalEventListeners(modalBody, modalFooter);
+
+            // Open modal
+            this.openModal('Edit URL', modalBody, modalFooter);
+
+        } catch (error) {
+            console.error('Error opening edit URL modal:', error);
+            this.showError('Failed to open edit URL dialog');
+        }
+    }
+
+    populateGroupSelect(selectElement, selectedGroupId = null) {
+        if (!selectElement) return;
+
+        // Clear existing options
+        selectElement.innerHTML = '';
+
+        // Sort groups with ungrouped first
+        const sortedGroups = [...this.groups].sort((a, b) => {
+            if (a.id === 'ungrouped') return -1;
+            if (b.id === 'ungrouped') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Add options for each group
+        sortedGroups.forEach(group => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            option.style.color = group.color || '#2196f3';
+
+            if (selectedGroupId && group.id === selectedGroupId) {
+                option.selected = true;
+            } else if (!selectedGroupId && group.id === 'ungrouped') {
+                option.selected = true; // Default to ungrouped
+            }
+
+            selectElement.appendChild(option);
+        });
+    }
+
+    setupAddURLModalEventListeners(modalBody, modalFooter) {
+        // Handle form submission
+        const form = modalBody.querySelector('#addURLForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleAddURL(form);
+            });
+        }
+
+        // Handle cancel button
+        const cancelBtn = modalFooter.querySelector('#cancelAddURL');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Handle real-time validation
+        const urlInput = modalBody.querySelector('#urlAddress');
+        const titleInput = modalBody.querySelector('#urlTitle');
+
+        if (urlInput) {
+            urlInput.addEventListener('input', () => this.validateURLInput(urlInput));
+            urlInput.addEventListener('blur', () => this.validateURLInput(urlInput));
+        }
+
+        if (titleInput) {
+            titleInput.addEventListener('input', () => this.validateTitleInput(titleInput));
+            titleInput.addEventListener('blur', () => this.validateTitleInput(titleInput));
+        }
+    }
+
+    setupEditURLModalEventListeners(modalBody, modalFooter) {
+        // Handle form submission
+        const form = modalBody.querySelector('#editURLForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleEditURL(form);
+            });
+        }
+
+        // Handle cancel button
+        const cancelBtn = modalFooter.querySelector('#cancelEditURL');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Handle delete button
+        const deleteBtn = modalFooter.querySelector('#deleteEditURL');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                const urlId = modalBody.querySelector('#editUrlId').value;
+                this.handleDeleteURL(urlId);
+            });
+        }
+
+        // Handle real-time validation
+        const urlInput = modalBody.querySelector('#editUrlAddress');
+        const titleInput = modalBody.querySelector('#editUrlTitle');
+
+        if (urlInput) {
+            urlInput.addEventListener('input', () => this.validateURLInput(urlInput, 'editUrlAddressError'));
+            urlInput.addEventListener('blur', () => this.validateURLInput(urlInput, 'editUrlAddressError'));
+        }
+
+        if (titleInput) {
+            titleInput.addEventListener('input', () => this.validateTitleInput(titleInput, 'editUrlTitleError'));
+            titleInput.addEventListener('blur', () => this.validateTitleInput(titleInput, 'editUrlTitleError'));
+        }
+    }
+
+    // URL Form Validation Methods (Task 4.3)
+    validateURLInput(urlInput, errorElementId = 'urlAddressError') {
+        const url = urlInput.value.trim();
+        const errorElement = document.getElementById(errorElementId);
+
+        if (!errorElement) return true;
+
+        let errorMessage = '';
+
+        if (!url) {
+            errorMessage = 'URL is required';
+        } else if (!this.isValidURL(url)) {
+            errorMessage = 'Please enter a valid URL (e.g., https://example.com)';
+        } else if (this.urls.some(u => u.url === url && u.id !== document.getElementById('editUrlId')?.value)) {
+            errorMessage = 'This URL is already saved';
+        }
+
+        errorElement.textContent = errorMessage;
+        urlInput.setAttribute('aria-invalid', errorMessage ? 'true' : 'false');
+
+        return !errorMessage;
+    }
+
+    validateTitleInput(titleInput, errorElementId = 'urlTitleError') {
+        const title = titleInput.value.trim();
+        const errorElement = document.getElementById(errorElementId);
+
+        if (!errorElement) return true;
+
+        let errorMessage = '';
+
+        if (!title) {
+            errorMessage = 'Title is required';
+        } else if (title.length > 200) {
+            errorMessage = 'Title must be 200 characters or less';
+        }
+
+        errorElement.textContent = errorMessage;
+        titleInput.setAttribute('aria-invalid', errorMessage ? 'true' : 'false');
+
+        return !errorMessage;
+    }
+
+    // URL CRUD Operations (Task 4.3)
+    async handleAddURL(form) {
+        try {
+            this.showLoading('Adding URL...');
+
+            // Get form data
+            const formData = new FormData(form);
+            const url = formData.get('urlAddress').trim();
+            const title = formData.get('urlTitle').trim();
+            const groupId = formData.get('urlGroup');
+
+            // Validate inputs
+            const urlInput = form.querySelector('#urlAddress');
+            const titleInput = form.querySelector('#urlTitle');
+
+            const isURLValid = this.validateURLInput(urlInput);
+            const isTitleValid = this.validateTitleInput(titleInput);
+
+            if (!isURLValid || !isTitleValid) {
+                this.hideLoading();
+                return;
+            }
+
+            // Create new URL using data model
+            const newURL = new URLDataModel({
+                url: url,
+                title: title,
+                groupId: groupId
+            });
+
+            // Validate the new URL
+            const validation = newURL.validate();
+            if (!validation.isValid) {
+                throw new Error(`Invalid URL data: ${validation.errors.join(', ')}`);
+            }
+
+            // Add to URLs array
+            this.urls.unshift(newURL); // Add to beginning for most recent first
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Close modal and show success
+            this.closeModal();
+            this.showMessage(`URL "${title}" saved successfully to ${this.getGroupById(groupId)?.name || 'Unknown Group'}!`);
+
+            this.hideLoading();
+
+        } catch (error) {
+            console.error('Error adding URL:', error);
+            this.showError(error.message || 'Failed to add URL');
+            this.hideLoading();
+        }
+    }
+
+    async handleEditURL(form) {
+        try {
+            this.showLoading('Updating URL...');
+
+            // Get form data
+            const formData = new FormData(form);
+            const urlId = formData.get('editUrlId');
+            const url = formData.get('editUrlAddress').trim();
+            const title = formData.get('editUrlTitle').trim();
+            const groupId = formData.get('editUrlGroup');
+
+            // Find existing URL
+            const existingURL = this.urls.find(u => u.id === urlId);
+            if (!existingURL) {
+                throw new Error('URL not found');
+            }
+
+            // Validate inputs
+            const urlInput = form.querySelector('#editUrlAddress');
+            const titleInput = form.querySelector('#editUrlTitle');
+
+            const isURLValid = this.validateURLInput(urlInput, 'editUrlAddressError');
+            const isTitleValid = this.validateTitleInput(titleInput, 'editUrlTitleError');
+
+            if (!isURLValid || !isTitleValid) {
+                this.hideLoading();
+                return;
+            }
+
+            // Update URL properties
+            existingURL.url = url;
+            existingURL.title = title;
+            existingURL.groupId = groupId;
+            existingURL.lastModified = new Date().toISOString();
+
+            // Update domain and favicon if URL changed
+            existingURL.domain = existingURL.extractDomain(url);
+            existingURL.favicon = existingURL.generateFaviconUrl(existingURL.domain);
+
+            // Validate the updated URL
+            const validation = existingURL.validate();
+            if (!validation.isValid) {
+                throw new Error(`Invalid URL data: ${validation.errors.join(', ')}`);
+            }
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Close modal and show success
+            this.closeModal();
+            this.showMessage(`URL "${title}" updated successfully!`);
+
+            this.hideLoading();
+
+        } catch (error) {
+            console.error('Error updating URL:', error);
+            this.showError(error.message || 'Failed to update URL');
+            this.hideLoading();
+        }
+    }
+
+    async handleDeleteURL(urlId) {
+        try {
+            const url = this.urls.find(u => u.id === urlId);
+            if (!url) {
+                throw new Error('URL not found');
+            }
+
+            // Show confirmation dialog
+            if (!confirm(`Are you sure you want to delete "${url.title}"?`)) {
+                return;
+            }
+
+            this.showLoading('Deleting URL...');
+
+            // Remove from URLs array
+            this.urls = this.urls.filter(u => u.id !== urlId);
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Close modal and show success
+            this.closeModal();
+            this.showMessage(`URL "${url.title}" deleted successfully!`);
+
+            this.hideLoading();
+
+        } catch (error) {
+            console.error('Error deleting URL:', error);
+            this.showError(error.message || 'Failed to delete URL');
+            this.hideLoading();
+        }
+    }
+
+    // Drag and Drop Functionality (Task 4.3)
+    handleURLDragStart(e, urlData) {
+        // Store the URL data in the drag event
+        e.dataTransfer.setData('text/plain', urlData.id);
+        e.dataTransfer.setData('application/json', JSON.stringify({
+            id: urlData.id,
+            title: urlData.title,
+            url: urlData.url,
+            groupId: urlData.groupId
+        }));
+
+        // Set drag effect
+        e.dataTransfer.effectAllowed = 'move';
+
+        // Add visual feedback
+        e.target.classList.add('dragging');
+
+        // Store dragged URL for reference
+        this.draggedURL = urlData;
+
+        console.log('Drag started for URL:', urlData.title);
+    }
+
+    handleURLDragEnd(e) {
+        // Remove visual feedback
+        e.target.classList.remove('dragging');
+
+        // Clear all group drag states
+        document.querySelectorAll('.group-header').forEach(header => {
+            header.classList.remove('drag-over');
+        });
+
+        // Clear reference
+        this.draggedURL = null;
+
+        console.log('Drag ended');
+    }
+
+    handleGroupDragOver(e, targetGroupId) {
+        e.preventDefault(); // Allow drop
+
+        // Only allow drop if we have a dragged URL and it's not the same group
+        if (this.draggedURL && this.draggedURL.groupId !== targetGroupId) {
+            e.dataTransfer.dropEffect = 'move';
+        } else {
+            e.dataTransfer.dropEffect = 'none';
+        }
+    }
+
+    handleGroupDragEnter(e, targetGroupId) {
+        e.preventDefault();
+
+        // Add visual feedback if valid drop target
+        if (this.draggedURL && this.draggedURL.groupId !== targetGroupId) {
+            e.currentTarget.classList.add('drag-over');
+        }
+    }
+
+    handleGroupDragLeave(e) {
+        // Remove visual feedback only if leaving the header element itself
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+    }
+
+    async handleGroupDrop(e, targetGroupId) {
+        e.preventDefault();
+
+        try {
+            // Remove visual feedback
+            e.currentTarget.classList.remove('drag-over');
+
+            // Get the dragged URL data
+            const urlId = e.dataTransfer.getData('text/plain');
+            const url = this.urls.find(u => u.id === urlId);
+
+            if (!url) {
+                console.error('Dragged URL not found:', urlId);
+                return;
+            }
+
+            // Don't move if it's the same group
+            if (url.groupId === targetGroupId) {
+                return;
+            }
+
+            const sourceGroup = this.getGroupById(url.groupId);
+            const targetGroup = this.getGroupById(targetGroupId);
+
+            this.showLoading(`Moving "${url.title}" to ${targetGroup?.name || 'Unknown Group'}...`);
+
+            // Update the URL's group
+            url.groupId = targetGroupId;
+            url.lastModified = new Date().toISOString();
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Show success message
+            this.showMessage(`"${url.title}" moved to ${targetGroup?.name || 'Unknown Group'} successfully!`);
+
+            this.hideLoading();
+
+            console.log(`URL "${url.title}" moved from ${sourceGroup?.name} to ${targetGroup?.name}`);
+
+        } catch (error) {
+            console.error('Error moving URL:', error);
+            this.showError('Failed to move URL to group');
+            this.hideLoading();
+        }
+    }
+
+    // Group Display State Management (Task 4.2)
+    isGroupExpanded(groupId) {
+        // Default to expanded for ungrouped, collapsed for others
+        if (this.groupExpandedState.hasOwnProperty(groupId)) {
+            return this.groupExpandedState[groupId];
+        }
+        return groupId === 'ungrouped'; // Default ungrouped to expanded
+    }
+
+    toggleGroupExpanded(groupId) {
+        const currentState = this.isGroupExpanded(groupId);
+        this.groupExpandedState[groupId] = !currentState;
+
+        // Update the UI
+        this.updateGroupDisplayState(groupId);
+
+        // Save state to local storage for persistence
+        this.saveGroupExpandedState();
+    }
+
+    updateGroupDisplayState(groupId) {
+        const header = document.querySelector(`[data-group-id="${groupId}"]`);
+        const groupContainer = document.querySelector(`[data-group-container-id="${groupId}"]`);
+
+        if (!header || !groupContainer) return;
+
+        const isExpanded = this.isGroupExpanded(groupId);
+        const chevron = header.querySelector('.group-chevron');
+
+        // Update header
+        header.setAttribute('aria-expanded', isExpanded.toString());
+        if (chevron) {
+            chevron.textContent = isExpanded ? '▼' : '▶';
+        }
+
+        // Update container visibility
+        if (isExpanded) {
+            groupContainer.classList.remove('group-collapsed');
+            groupContainer.classList.add('group-expanded');
+        } else {
+            groupContainer.classList.remove('group-expanded');
+            groupContainer.classList.add('group-collapsed');
+        }
+    }
+
+    async loadGroupExpandedState() {
+        try {
+            const result = await chrome.storage.local.get(['groupExpandedState']);
+            this.groupExpandedState = result.groupExpandedState || {};
+        } catch (error) {
+            console.warn('Could not load group expanded state:', error);
+            this.groupExpandedState = {};
+        }
+    }
+
+    async saveGroupExpandedState() {
+        try {
+            await chrome.storage.local.set({ groupExpandedState: this.groupExpandedState });
+        } catch (error) {
+            console.warn('Could not save group expanded state:', error);
+        }
+    }
+
+    // Group Navigation Accessibility (Task 4.2)
+    handleGroupHeaderKeyNavigation(e) {
+        const currentHeader = e.target;
+        const allHeaders = Array.from(document.querySelectorAll('.group-header'));
+        const currentIndex = allHeaders.indexOf(currentHeader);
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                const nextIndex = (currentIndex + 1) % allHeaders.length;
+                allHeaders[nextIndex].focus();
+                break;
+
+            case 'ArrowUp':
+                e.preventDefault();
+                const prevIndex = currentIndex === 0 ? allHeaders.length - 1 : currentIndex - 1;
+                allHeaders[prevIndex].focus();
+                break;
+
+            case 'Home':
+                e.preventDefault();
+                allHeaders[0].focus();
+                break;
+
+            case 'End':
+                e.preventDefault();
+                allHeaders[allHeaders.length - 1].focus();
+                break;
+
+            case 'ArrowRight':
+                // Expand if collapsed
+                const groupId = currentHeader.getAttribute('data-group-id');
+                if (!this.isGroupExpanded(groupId)) {
+                    e.preventDefault();
+                    this.toggleGroupExpanded(groupId);
+                }
+                break;
+
+            case 'ArrowLeft':
+                // Collapse if expanded
+                const groupIdLeft = currentHeader.getAttribute('data-group-id');
+                if (this.isGroupExpanded(groupIdLeft)) {
+                    e.preventDefault();
+                    this.toggleGroupExpanded(groupIdLeft);
+                }
+                break;
+        }
+    }
+
+    // URL Action Methods (Task 4.3: Implemented)
     editURL(urlId) {
-        console.log('Edit URL:', urlId);
-        this.showMessage('Edit functionality coming in next phase');
+        this.openEditURLModal(urlId);
     }
 
     deleteURL(urlId) {
-        console.log('Delete URL:', urlId);
-        this.showMessage('Delete functionality coming in next phase');
+        this.handleDeleteURL(urlId);
     }
 
     // Storage Quota Management (Task 3.3: Updated for data models)
