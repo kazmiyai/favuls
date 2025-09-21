@@ -381,6 +381,44 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    justify-content: space-between;
+}
+
+.group-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.group-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.group-action-btn:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(1.1);
+}
+
+.group-action-btn:focus {
+    outline: none;
+    background-color: rgba(74, 144, 226, 0.1);
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
+}
+
+.group-action-btn:active {
+    transform: scale(0.95);
 }
 
 .group-chevron {
@@ -670,6 +708,15 @@ body {
 
 .group-header.drag-over .group-chevron {
     color: white;
+}
+
+.group-header.drag-over .group-action-btn {
+    opacity: 0.8;
+}
+
+.group-header.drag-over .group-action-btn:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* URL Item Drag States */

@@ -127,6 +127,33 @@
         <button type="submit" class="btn btn-primary" form="createGroupForm" id="saveCreateGroup">Create Group</button>
     </template>
 
+    <!-- Edit Group Modal Template (hidden) -->
+    <template id="editGroupModalTemplate">
+        <form class="edit-group-form" id="editGroupForm">
+            <div class="form-group">
+                <label class="form-label" for="editGroupName">Group Name</label>
+                <input type="text"
+                       class="form-input"
+                       id="editGroupName"
+                       name="editGroupName"
+                       placeholder="Enter group name"
+                       maxlength="50"
+                       required
+                       aria-describedby="editGroupNameHelp">
+                <div class="form-help" id="editGroupNameHelp">Maximum 50 characters</div>
+                <div class="form-error" id="editGroupNameError" role="alert" aria-live="polite"></div>
+            </div>
+
+            <input type="hidden" id="editGroupId" name="editGroupId" value="">
+        </form>
+    </template>
+
+    <!-- Edit Group Modal Footer Template (hidden) -->
+    <template id="editGroupModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="cancelEditGroup">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="editGroupForm" id="saveEditGroup">OK</button>
+    </template>
+
     <!-- Add URL Modal Template (hidden) -->
     <template id="addURLModalTemplate">
         <form class="add-url-form" id="addURLForm">
