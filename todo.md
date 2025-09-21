@@ -161,7 +161,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
 **Goal:** Full CRUD operations and improved UI
 
 ### 5.1 Manual URL Addition
-- [ ] **Task:** Add URLs manually (not current tab)
+- [x] **Task:** Add URLs manually (not current tab)
   - **Details:**
     - Add URL modal with URL and title inputs
     - URL validation
@@ -171,7 +171,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Manual URL addition
 
 ### 5.2 URL Editing
-- [ ] **Task:** Edit existing URLs
+- [x] **Task:** Edit existing URLs
   - **Details:**
     - Edit modal with pre-filled data
     - Update URL, title, group
@@ -181,7 +181,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** URL editing functionality
 
 ### 5.3 URL Deletion
-- [ ] **Task:** Delete URLs
+- [x] **Task:** Delete URLs
   - **Details:**
     - Delete button in edit modal
     - Confirmation dialog
@@ -191,7 +191,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** URL deletion functionality
 
 ### 5.4 Open URL in New Tab
-- [ ] **Task:** Open URLs in new tab on click
+- [x] **Task:** Open URLs in new tab on click
   - **Details:**
     - Use chrome.tabs API
     - Open in new tab
@@ -201,7 +201,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** URL opening functionality
 
 ### 5.5 Favicon Integration
-- [ ] **Task:** Display favicons for URLs
+- [x] **Task:** Display favicons for URLs
   - **Details:**
     - Use Google Favicon API: `https://www.google.com/s2/favicons?domain={domain}&sz=16`
     - Fallback to default icon
