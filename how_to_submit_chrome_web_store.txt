@@ -1,0 +1,117 @@
+⏺ Chrome Web StoreにChrome拡張機能を公開する手順をご説明します。
+
+  📋 Chrome Web Store 公開手順
+
+  1. 事前準備
+
+  - 開発者アカウント登録
+    - Google Chrome Developer Dashboard にアクセス
+    - 一回限りの $5 登録料が必要
+    - Google アカウントでサインイン
+
+  2. 拡張機能の準備
+
+  # 本番用ビルドの作成
+  zip -r favurl-extension.zip . -x "*.git*" "node_modules/*" "*.DS_Store"
+
+  必須ファイル確認:
+  - manifest.json (正しいバージョン、権限設定)
+  - アイコンファイル (16x16, 48x48, 128x128)
+  - 全ての必要なHTMLファイル、CSSファイル、JSファイル
+
+  3. Store用アセットの準備
+
+  アイコン:
+  - 128x128px (Chrome Web Store用)
+
+  スクリーンショット:
+  - 1280x800px または 640x400px
+  - 最低1枚、最大5枚
+  - 拡張機能の使用方法を示す画像
+
+  プロモーション用画像 (オプション):
+  - Small tile: 440x280px
+  - Large tile: 920x680px
+  - Marquee: 1400x560px
+
+  4. アップロード手順
+
+  1. Chrome Developer Dashboard にアクセス
+  https://chrome.google.com/webstore/devconsole/
+  2. 新しいアイテムを追加
+    - "Add new item" をクリック
+    - ZIPファイルをアップロード
+  3. Store一覧情報の入力
+    - アプリ名: "FavURL - Bookmark Manager"
+    - 説明: 詳細な機能説明
+    - カテゴリ: "Productivity"
+    - 言語: 日本語/英語
+    - 価格: Free
+
+  5. 必要な情報
+
+  短い説明 (132文字以内):
+  A modern bookmark manager with local sync, URL grouping, and export/import functionality for Chrome.
+
+  詳細説明:
+  FavURL is a powerful Chrome extension for bookmark management with:
+
+  ✓ One-click URL saving from current tab
+  ✓ Custom group organization
+  ✓ Local storage with Chrome sync
+  ✓ Export/Import JSON functionality
+  ✓ Modern, business-friendly interface
+  ✓ Offline-first design
+  ✓ Keyboard navigation support
+
+  Perfect for professionals who need organized bookmark management across devices.
+
+  6. プライバシーとセキュリティ
+
+  プライバシーポリシー (必須):
+  - データ収集なし
+  - ローカルストレージのみ使用
+  - 外部サーバーへの送信なし
+
+  権限の説明:
+  - activeTab: 現在のタブ情報取得用
+  - storage: ローカルブックマーク保存用
+
+  7. 審査プロセス
+
+  審査時間:
+  - 通常1-3営業日
+  - 初回は最大7日間
+
+  審査のポイント:
+  - manifest.json の妥当性
+  - 権限の適切な使用
+  - プライバシーポリシーの明確性
+  - 機能説明の正確性
+
+  8. 公開後の管理
+
+  アップデート:
+  - manifest.json の version を更新
+  - 新しいZIPファイルをアップロード
+  - 変更ログを提供
+
+  分析:
+  - ユーザー数、評価、フィードバックの確認
+  - Chrome Developer Dashboard で統計確認
+
+  9. 推奨事項
+
+  リリース前チェック:
+  # テスト用にローカルで読み込み
+  chrome://extensions/ → Developer mode → Load unpacked
+
+  品質保証:
+  - 複数のサイトでテスト
+  - 異なるChrome版でテスト
+  - エラーログの確認
+
+  マーケティング:
+  - 適切なキーワードを説明に含める
+  - 高品質なスクリーンショット
+  - ユーザーレビューへの返信
