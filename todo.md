@@ -89,7 +89,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
 **Goal:** Permanent storage and cross-device sync
 
 ### 3.1 Storage API Integration
-- [ ] **Task:** Implement chrome.storage.sync for data persistence
+- [x] **Task:** Implement chrome.storage.sync for data persistence
   - **Details:**
     - Storage keys: "urls" and "groups"
     - Save/load URL data
@@ -99,7 +99,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Persistent URL storage
 
 ### 3.2 Default Group Setup
-- [ ] **Task:** Create default "Ungrouped" group
+- [x] **Task:** Create default "Ungrouped" group
   - **Details:**
     - Default group id: "ungrouped"
     - Auto-create if not exists
@@ -109,7 +109,7 @@ Chrome extension for bookmark management with local sync (chrome.storage.sync)
   - **Deliverable:** Default group functionality
 
 ### 3.3 Data Model Implementation
-- [ ] **Task:** Implement complete data structure
+- [x] **Task:** Implement complete data structure
   - **Details:**
     - URL object: id, url, title, timestamp, groupId
     - Group object: id, name, created
