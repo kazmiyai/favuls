@@ -623,12 +623,33 @@ class BookmarkManager {
                 <span class="group-chevron" aria-hidden="true">${chevronIcon}</span>
                 <span class="group-name" style="color: ${group.color || '#2196f3'}">${this.escapeHtml(group.name)}</span>
                 <span class="group-count">${count}</span>
+                ${!group.protected ? `
+                <div class="group-actions">
+                    <button class="group-action-btn" data-action="edit" data-group-id="${group.id}" aria-label="Edit group" title="Edit group">
+                        ✏️
+                    </button>
+                    <button class="group-action-btn" data-action="delete" data-group-id="${group.id}" aria-label="Delete group" title="Delete group">
+                        🗑️
+                    </button>
+                </div>
+                ` : ''}
             </div>
         `;
 
-        // Add click handler for expand/collapse
-        header.addEventListener('click', () => {
-            this.toggleGroupExpanded(group.id);
+        // Add click handler for expand/collapse and group actions
+        header.addEventListener('click', (e) => {
+            const action = e.target.getAttribute('data-action');
+            const groupId = e.target.getAttribute('data-group-id');
+
+            if (action === 'edit') {
+                e.stopPropagation();
+                this.editGroup(groupId);
+            } else if (action === 'delete') {
+                e.stopPropagation();
+                this.deleteGroup(groupId);
+            } else if (!e.target.closest('.group-actions')) {
+                this.toggleGroupExpanded(group.id);
+            }
         });
 
         // Add keyboard handler
@@ -781,6 +802,60 @@ class BookmarkManager {
         }
 
         return true;
+    }
+
+    // Delete Group with confirmation
+    async deleteGroup(groupId) {
+        try {
+            const group = this.groups.find(g => g.id === groupId);
+            if (!group) {
+                this.showError('Group not found');
+                return;
+            }
+
+            // Check if group can be deleted
+            if (!this.canDeleteGroup(groupId)) {
+                this.showError('Cannot delete this group. It is protected.');
+                return;
+            }
+
+            // Count URLs in this group
+            const urlsInGroup = this.urls.filter(u => u.groupId === groupId);
+            const urlCount = urlsInGroup.length;
+
+            // Show confirmation dialog
+            const confirmMessage = urlCount > 0
+                ? `Are you sure you want to delete the group "${group.name}"? This will also delete ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} in this group.`
+                : `Are you sure you want to delete the group "${group.name}"?`;
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            this.showLoading('Deleting group...');
+
+            // Remove all URLs in this group
+            this.urls = this.urls.filter(u => u.groupId !== groupId);
+
+            // Remove the group
+            this.groups = this.groups.filter(g => g.id !== groupId);
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Show success message
+            this.showMessage(`Group "${group.name}" and ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} deleted successfully!`);
+
+            this.hideLoading();
+
+        } catch (error) {
+            console.error('Error deleting group:', error);
+            this.showError(error.message || 'Failed to delete group');
+            this.hideLoading();
+        }
     }
 
     // Move URLs from deleted group to default group
@@ -989,6 +1064,153 @@ class BookmarkManager {
         } catch (error) {
             console.error('Error creating group:', error);
             this.showError(error.message || 'Failed to create group');
+            this.hideLoading();
+        }
+    }
+
+    // Edit Group Methods
+    editGroup(groupId) {
+        try {
+            const group = this.groups.find(g => g.id === groupId);
+            if (!group) {
+                this.showError('Group not found');
+                return;
+            }
+
+            // Check if group can be edited
+            if (group.protected) {
+                this.showError('Cannot edit this group. It is protected.');
+                return;
+            }
+
+            // Clone template content
+            const template = document.getElementById('editGroupModalTemplate');
+            const footerTemplate = document.getElementById('editGroupModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Edit group modal templates not found');
+                return;
+            }
+
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Populate form with existing data
+            modalBody.querySelector('#editGroupName').value = group.name;
+            modalBody.querySelector('#editGroupId').value = group.id;
+
+            // Set up event listeners for the form
+            this.setupEditGroupModalEventListeners(modalBody, modalFooter);
+
+            // Open modal
+            this.openModal('Edit Group', modalBody, modalFooter);
+
+        } catch (error) {
+            console.error('Error opening edit group modal:', error);
+            this.showError('Failed to open edit group dialog');
+        }
+    }
+
+    setupEditGroupModalEventListeners(modalBody, modalFooter) {
+        // Handle form submission
+        const form = modalBody.querySelector('#editGroupForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleEditGroup(form);
+            });
+        }
+
+        // Handle cancel button
+        const cancelBtn = modalFooter.querySelector('#cancelEditGroup');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Handle real-time validation
+        const nameInput = modalBody.querySelector('#editGroupName');
+        if (nameInput) {
+            nameInput.addEventListener('input', () => this.validateEditGroupName(nameInput));
+            nameInput.addEventListener('blur', () => this.validateEditGroupName(nameInput));
+        }
+    }
+
+    validateEditGroupName(nameInput) {
+        const name = nameInput.value.trim();
+        const errorElement = document.getElementById('editGroupNameError');
+        const currentGroupId = document.getElementById('editGroupId').value;
+
+        if (!errorElement) return true;
+
+        let errorMessage = '';
+
+        if (!name) {
+            errorMessage = 'Group name is required';
+        } else if (name.length > 50) {
+            errorMessage = 'Group name must be 50 characters or less';
+        } else {
+            // Check for duplicate names (excluding current group)
+            const existingGroup = this.groups.find(g =>
+                g.name.toLowerCase() === name.toLowerCase() && g.id !== currentGroupId
+            );
+            if (existingGroup) {
+                errorMessage = 'A group with this name already exists';
+            }
+        }
+
+        errorElement.textContent = errorMessage;
+        nameInput.setAttribute('aria-invalid', errorMessage ? 'true' : 'false');
+
+        return !errorMessage;
+    }
+
+    async handleEditGroup(form) {
+        try {
+            this.showLoading('Updating group...');
+
+            // Get form data
+            const formData = new FormData(form);
+            const groupId = formData.get('editGroupId');
+            const groupName = formData.get('editGroupName').trim();
+
+            // Find existing group
+            const existingGroup = this.groups.find(g => g.id === groupId);
+            if (!existingGroup) {
+                throw new Error('Group not found');
+            }
+
+            // Validate group name
+            const nameInput = form.querySelector('#editGroupName');
+            if (!this.validateEditGroupName(nameInput)) {
+                this.hideLoading();
+                return;
+            }
+
+            // Update group properties
+            existingGroup.name = groupName;
+            existingGroup.lastModified = new Date().toISOString();
+
+            // Validate the updated group
+            const validation = existingGroup.validate();
+            if (!validation.isValid) {
+                throw new Error(`Invalid group data: ${validation.errors.join(', ')}`);
+            }
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Close modal and show success
+            this.closeModal();
+            this.showMessage(`Group "${groupName}" updated successfully!`);
+
+            this.hideLoading();
+
+        } catch (error) {
+            console.error('Error updating group:', error);
+            this.showError(error.message || 'Failed to update group');
             this.hideLoading();
         }
     }
