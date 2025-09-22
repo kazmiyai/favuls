@@ -13,16 +13,39 @@
             <h1 class="header-title">FavURL</h1>
             <p class="header-subtitle">Bookmark Manager</p>
 
-            <!-- Start Page Toggle -->
-            <div class="start-page-toggle">
-                <label class="toggle-label" for="startPageToggle">
-                    <span class="toggle-text">Enable Start Page</span>
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="startPageToggle" class="toggle-input" checked>
-                        <span class="toggle-slider"></span>
+            <!-- Header Controls -->
+            <div class="header-controls">
+                <!-- Start Page Toggle -->
+                <div class="start-page-toggle">
+                    <label class="toggle-label" for="startPageToggle">
+                        <span class="toggle-text">Enable Start Page</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="startPageToggle" class="toggle-input" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Menu Button -->
+                <div class="menu-container">
+                    <button class="menu-button" id="menuButton" aria-label="Options menu" aria-expanded="false">
+                        <span class="menu-icon">⋮</span>
+                    </button>
+                    <div class="menu-dropdown" id="menuDropdown" role="menu" aria-hidden="true">
+                        <button class="menu-item" id="exportData" role="menuitem">
+                            <span class="menu-item-icon">⬇</span>
+                            <span class="menu-item-text">Export Data</span>
+                        </button>
+                        <button class="menu-item" id="importData" role="menuitem">
+                            <span class="menu-item-icon">⬆</span>
+                            <span class="menu-item-text">Import Data</span>
+                        </button>
                     </div>
-                </label>
+                </div>
             </div>
+
+            <!-- Hidden file input for import -->
+            <input type="file" id="importFileInput" accept=".json" style="display: none;" aria-label="Select JSON file to import">
         </header>
 
         <!-- Main Content -->

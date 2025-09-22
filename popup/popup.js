@@ -332,6 +332,82 @@ class BookmarkManager {
             addURLBtn.addEventListener('click', () => this.openAddURLModal());
         }
 
+        // Menu button and dropdown
+        const menuButton = document.getElementById('menuButton');
+        const menuDropdown = document.getElementById('menuDropdown');
+        if (menuButton && menuDropdown) {
+            menuButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleMenu();
+            });
+
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!menuButton.contains(e.target) && !menuDropdown.contains(e.target)) {
+                    this.closeMenu();
+                }
+            });
+
+            // Menu keyboard navigation
+            menuButton.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.toggleMenu();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.openMenu();
+                    const firstItem = menuDropdown.querySelector('.menu-item');
+                    if (firstItem) firstItem.focus();
+                }
+            });
+
+            // Menu item navigation
+            menuDropdown.addEventListener('keydown', (e) => {
+                const menuItems = menuDropdown.querySelectorAll('.menu-item');
+                const currentIndex = Array.from(menuItems).indexOf(e.target);
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextIndex = (currentIndex + 1) % menuItems.length;
+                    menuItems[nextIndex].focus();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevIndex = currentIndex === 0 ? menuItems.length - 1 : currentIndex - 1;
+                    menuItems[prevIndex].focus();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.closeMenu();
+                    menuButton.focus();
+                }
+            });
+        }
+
+        // Export data button
+        const exportDataBtn = document.getElementById('exportData');
+        if (exportDataBtn) {
+            exportDataBtn.addEventListener('click', () => {
+                this.closeMenu();
+                this.exportData();
+            });
+        }
+
+        // Import data button
+        const importDataBtn = document.getElementById('importData');
+        if (importDataBtn) {
+            importDataBtn.addEventListener('click', () => {
+                this.closeMenu();
+                this.importData();
+            });
+        }
+
+        // File input for import
+        const importFileInput = document.getElementById('importFileInput');
+        if (importFileInput) {
+            importFileInput.addEventListener('change', (e) => {
+                this.handleImportFile(e.target.files[0]);
+            });
+        }
+
         // Modal close button
         const modalClose = document.querySelector('.modal-close');
         if (modalClose) {
@@ -2854,6 +2930,301 @@ class BookmarkManager {
                 toast.parentNode.removeChild(toast);
             }
         }, 5000);
+    }
+
+    // Menu functionality
+    toggleMenu() {
+        const menuButton = document.getElementById('menuButton');
+        const menuDropdown = document.getElementById('menuDropdown');
+        if (!menuButton || !menuDropdown) return;
+
+        const isOpen = menuButton.getAttribute('aria-expanded') === 'true';
+        if (isOpen) {
+            this.closeMenu();
+        } else {
+            this.openMenu();
+        }
+    }
+
+    openMenu() {
+        const menuButton = document.getElementById('menuButton');
+        const menuDropdown = document.getElementById('menuDropdown');
+        if (!menuButton || !menuDropdown) return;
+
+        menuButton.setAttribute('aria-expanded', 'true');
+        menuDropdown.setAttribute('aria-hidden', 'false');
+    }
+
+    closeMenu() {
+        const menuButton = document.getElementById('menuButton');
+        const menuDropdown = document.getElementById('menuDropdown');
+        if (!menuButton || !menuDropdown) return;
+
+        menuButton.setAttribute('aria-expanded', 'false');
+        menuDropdown.setAttribute('aria-hidden', 'true');
+    }
+
+    // Export functionality
+    async exportData() {
+        try {
+            // Load current data from storage
+            const result = await chrome.storage.sync.get(['urls', 'groups']);
+
+            // Create export data with metadata
+            const exportData = {
+                metadata: {
+                    version: "1.0",
+                    exportDate: new Date().toISOString(),
+                    source: "FavURL Extension",
+                    totalGroups: (result.groups || []).length,
+                    totalUrls: (result.urls || []).length
+                },
+                groups: result.groups || [],
+                urls: result.urls || []
+            };
+
+            // Convert to JSON
+            const jsonString = JSON.stringify(exportData, null, 2);
+
+            // Create filename with timestamp
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `favurl-backup-${timestamp}.json`;
+
+            // Create blob and download
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            // Create temporary download link
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = filename;
+            downloadLink.style.display = 'none';
+
+            // Trigger download
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            // Clean up blob URL
+            URL.revokeObjectURL(url);
+
+            this.showToast(`Data exported successfully as ${filename}`);
+            console.log('Export completed:', filename);
+
+        } catch (error) {
+            console.error('Export failed:', error);
+            this.showToast('Export failed. Please try again.');
+        }
+    }
+
+    // Import functionality
+    importData() {
+        const fileInput = document.getElementById('importFileInput');
+        if (fileInput) {
+            fileInput.click();
+        }
+    }
+
+    async handleImportFile(file) {
+        if (!file) return;
+
+        try {
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                this.showToast('Please select a JSON file.');
+                return;
+            }
+
+            // Check file size (limit to 1MB)
+            if (file.size > 1024 * 1024) {
+                this.showToast('File is too large. Maximum size is 1MB.');
+                return;
+            }
+
+            // Read file content
+            const fileContent = await this.readFileAsText(file);
+
+            // Parse JSON
+            let importData;
+            try {
+                importData = JSON.parse(fileContent);
+            } catch (parseError) {
+                this.showToast('Invalid JSON file. Please check the file format.');
+                return;
+            }
+
+            // Validate import data structure
+            const validation = this.validateImportData(importData);
+            if (!validation.valid) {
+                this.showToast(`Import validation failed: ${validation.error}`);
+                return;
+            }
+
+            // Show confirmation dialog
+            this.showImportConfirmation(importData);
+
+        } catch (error) {
+            console.error('Import file handling failed:', error);
+            this.showToast('Failed to read the file. Please try again.');
+        }
+    }
+
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsText(file);
+        });
+    }
+
+    validateImportData(data) {
+        // Check required structure
+        if (!data || typeof data !== 'object') {
+            return { valid: false, error: 'Invalid data format' };
+        }
+
+        if (!data.groups || !Array.isArray(data.groups)) {
+            return { valid: false, error: 'Missing or invalid groups data' };
+        }
+
+        if (!data.urls || !Array.isArray(data.urls)) {
+            return { valid: false, error: 'Missing or invalid URLs data' };
+        }
+
+        // Validate groups
+        for (const group of data.groups) {
+            if (!group.id || !group.name) {
+                return { valid: false, error: 'Invalid group data: missing id or name' };
+            }
+        }
+
+        // Validate URLs
+        for (const url of data.urls) {
+            if (!url.id || !url.url || !url.title) {
+                return { valid: false, error: 'Invalid URL data: missing required fields' };
+            }
+
+            // Basic URL validation
+            try {
+                new URL(url.url);
+            } catch {
+                return { valid: false, error: `Invalid URL format: ${url.url}` };
+            }
+        }
+
+        return { valid: true };
+    }
+
+    showImportConfirmation(importData) {
+        const { groups, urls } = importData;
+        const groupCount = groups.length;
+        const urlCount = urls.length;
+
+        const confirmMessage = `
+            This will import ${groupCount} group(s) and ${urlCount} URL(s).
+
+            Your existing data will be merged with the imported data.
+            Duplicate URLs will be updated if they have newer timestamps.
+
+            Do you want to continue?
+        `;
+
+        if (confirm(confirmMessage.trim())) {
+            this.processImport(importData);
+        }
+    }
+
+    async processImport(importData) {
+        try {
+            // Load existing data
+            const existing = await chrome.storage.sync.get(['urls', 'groups']);
+            const existingUrls = existing.urls || [];
+            const existingGroups = existing.groups || [];
+
+            // Merge groups
+            const mergedGroups = this.mergeGroups(existingGroups, importData.groups);
+
+            // Merge URLs
+            const mergedUrls = this.mergeUrls(existingUrls, importData.urls);
+
+            // Save merged data
+            await chrome.storage.sync.set({
+                groups: mergedGroups,
+                urls: mergedUrls
+            });
+
+            // Reload data and UI
+            await this.loadData();
+            this.renderURLs();
+
+            this.showToast(`Import completed: ${importData.urls.length} URLs and ${importData.groups.length} groups processed.`);
+            console.log('Import completed successfully');
+
+        } catch (error) {
+            console.error('Import processing failed:', error);
+            this.showToast('Import failed. Please try again.');
+        }
+    }
+
+    mergeGroups(existing, imported) {
+        const groupMap = new Map();
+
+        // Add existing groups
+        existing.forEach(group => {
+            groupMap.set(group.id, group);
+        });
+
+        // Merge imported groups
+        imported.forEach(importedGroup => {
+            const existing = groupMap.get(importedGroup.id);
+            if (existing) {
+                // Update if imported group is newer
+                const existingTime = new Date(existing.lastModified || existing.created || 0);
+                const importedTime = new Date(importedGroup.lastModified || importedGroup.created || 0);
+
+                if (importedTime > existingTime) {
+                    groupMap.set(importedGroup.id, importedGroup);
+                }
+            } else {
+                // Add new group
+                groupMap.set(importedGroup.id, importedGroup);
+            }
+        });
+
+        return Array.from(groupMap.values());
+    }
+
+    mergeUrls(existing, imported) {
+        const urlMap = new Map();
+
+        // Add existing URLs
+        existing.forEach(url => {
+            const key = `${url.url}|${url.title}`;
+            urlMap.set(key, url);
+        });
+
+        // Merge imported URLs
+        imported.forEach(importedUrl => {
+            const key = `${importedUrl.url}|${importedUrl.title}`;
+            const existing = urlMap.get(key);
+
+            if (existing) {
+                // Update if imported URL is newer
+                const existingTime = new Date(existing.lastModified || existing.timestamp || 0);
+                const importedTime = new Date(importedUrl.lastModified || importedUrl.timestamp || 0);
+
+                if (importedTime > existingTime) {
+                    urlMap.set(key, importedUrl);
+                }
+            } else {
+                // Add new URL
+                urlMap.set(key, importedUrl);
+            }
+        });
+
+        return Array.from(urlMap.values());
     }
 }
 
