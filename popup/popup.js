@@ -98,6 +98,7 @@ class GroupDataModel {
         this.color = data.color || '#2196f3';
         this.description = data.description || '';
         this.urlCount = data.urlCount || 0;
+        this.order = data.order !== undefined ? data.order : 0;
         this.isValidated = false;
     }
 
@@ -136,7 +137,8 @@ class GroupDataModel {
             protected: this.protected,
             color: this.color,
             description: this.description,
-            urlCount: this.urlCount
+            urlCount: this.urlCount,
+            order: this.order
         };
     }
 
@@ -151,7 +153,8 @@ class GroupDataModel {
             isDefault: true,
             protected: true,
             color: '#9e9e9e',
-            description: 'Default group for uncategorized bookmarks'
+            description: 'Default group for uncategorized bookmarks',
+            order: 0
         });
     }
 }
@@ -251,6 +254,9 @@ class BookmarkManager {
 
             // Update URL counts in groups
             this.updateGroupUrlCounts();
+
+            // Initialize group orders for existing groups
+            this.initializeGroupOrders();
 
             // Save if we made any fixes or if this is first time setup
             if (this.lastDataValidation && this.lastDataValidation.hasChanges) {
@@ -575,6 +581,45 @@ class BookmarkManager {
         });
     }
 
+    initializeGroupOrders() {
+        let hasChanges = false;
+        let nextOrder = 1; // Start from 1, ungrouped stays at 0
+
+        // First pass: set order for ungrouped group to 0
+        const ungroupedGroup = this.groups.find(g => g.id === 'ungrouped');
+        if (ungroupedGroup && ungroupedGroup.order === undefined) {
+            ungroupedGroup.order = 0;
+            hasChanges = true;
+        }
+
+        // Second pass: assign orders to groups that don't have them
+        this.groups.forEach(group => {
+            if (group.id !== 'ungrouped' && (group.order === undefined || group.order === null)) {
+                group.order = nextOrder;
+                nextOrder++;
+                hasChanges = true;
+            }
+        });
+
+        if (hasChanges) {
+            console.log('Initialized group orders for existing groups');
+            // Mark that we have changes that need to be saved
+            if (!this.lastDataValidation) {
+                this.lastDataValidation = { hasChanges: false };
+            }
+            this.lastDataValidation.hasChanges = true;
+        }
+    }
+
+    getNextGroupOrder() {
+        if (this.groups.length === 0) {
+            return 1; // First non-ungrouped group gets order 1
+        }
+
+        const maxOrder = Math.max(...this.groups.map(g => g.order || 0));
+        return maxOrder + 1;
+    }
+
     async migrateDataModel(fromVersion) {
         console.log(`Migrating data model from version ${fromVersion} to ${this.dataModelVersion}`);
 
@@ -608,15 +653,15 @@ class BookmarkManager {
         // Group URLs by groupId
         const groupedURLs = this.groupURLsByGroup();
 
-        // Sort groups to show ungrouped first, then others alphabetically
+        // Sort groups by order, with ungrouped first regardless of order
         const sortedGroupIds = Object.keys(groupedURLs).sort((a, b) => {
             if (a === 'ungrouped') return -1;
             if (b === 'ungrouped') return 1;
             const groupA = this.groups.find(g => g.id === a);
             const groupB = this.groups.find(g => g.id === b);
-            const nameA = groupA ? groupA.name : 'Unknown';
-            const nameB = groupB ? groupB.name : 'Unknown';
-            return nameA.localeCompare(nameB);
+            const orderA = groupA ? (groupA.order || 0) : 999;
+            const orderB = groupB ? (groupB.order || 0) : 999;
+            return orderA - orderB;
         });
 
         // Render each group
@@ -658,12 +703,21 @@ class BookmarkManager {
         header.setAttribute('role', 'button');
         header.setAttribute('tabindex', '0');
         header.setAttribute('aria-expanded', this.isGroupExpanded(group.id).toString());
-        header.setAttribute('aria-label', `Toggle ${group.name} group with ${count} bookmark${count !== 1 ? 's' : ''}`);
+        const reorderHint = !group.protected ? '. Use Ctrl+Shift+Arrow keys to reorder, or drag to reorder' : '';
+        header.setAttribute('aria-label', `Toggle ${group.name} group with ${count} bookmark${count !== 1 ? 's' : ''}${reorderHint}`);
 
         const isExpanded = this.isGroupExpanded(group.id);
         const chevronIcon = isExpanded ? '▼' : '▶';
+        const isDraggable = !group.protected; // Don't allow dragging protected groups like "Ungrouped"
+
+        // Make header draggable if allowed
+        if (isDraggable) {
+            header.setAttribute('draggable', 'true');
+            header.classList.add('draggable');
+        }
 
         header.innerHTML = `
+            ${isDraggable ? '<div class="group-drag-handle" title="Drag to reorder"></div>' : ''}
             <div class="group-header-content">
                 <span class="group-chevron" aria-hidden="true">${chevronIcon}</span>
                 <span class="group-name" style="color: ${group.color || '#2196f3'}">${this.escapeHtml(group.name)}</span>
@@ -683,6 +737,12 @@ class BookmarkManager {
 
         // Add click handler for expand/collapse and group actions
         header.addEventListener('click', (e) => {
+            // Don't trigger expand/collapse if clicking on drag handle
+            if (e.target.closest('.group-drag-handle')) {
+                e.preventDefault();
+                return;
+            }
+
             const action = e.target.getAttribute('data-action');
             const groupId = e.target.getAttribute('data-group-id');
 
@@ -705,21 +765,32 @@ class BookmarkManager {
             }
         });
 
-        // Task 4.3: Add drag-and-drop support for group headers
+        // Group reordering drag events (only for draggable groups)
+        if (isDraggable) {
+            header.addEventListener('dragstart', (e) => {
+                this.handleGroupDragStart(e, group);
+            });
+
+            header.addEventListener('dragend', (e) => {
+                this.handleGroupDragEnd(e);
+            });
+        }
+
+        // Unified drag and drop support (handles both group reordering and URL-to-group assignment)
         header.addEventListener('dragover', (e) => {
-            this.handleGroupDragOver(e, group.id);
+            this.handleUnifiedDragOver(e, group.id);
         });
 
         header.addEventListener('drop', (e) => {
-            this.handleGroupDrop(e, group.id);
+            this.handleUnifiedDrop(e, group.id);
         });
 
         header.addEventListener('dragenter', (e) => {
-            this.handleGroupDragEnter(e, group.id);
+            this.handleUnifiedDragEnter(e, group.id);
         });
 
         header.addEventListener('dragleave', (e) => {
-            this.handleGroupDragLeave(e);
+            this.handleUnifiedDragLeave(e);
         });
 
         return header;
@@ -1082,7 +1153,8 @@ class BookmarkManager {
             const newGroup = new GroupDataModel({
                 name: groupName,
                 color: groupColor,
-                description: groupDescription
+                description: groupDescription,
+                order: this.getNextGroupOrder()
             });
 
             // Validate the new group
@@ -1349,11 +1421,11 @@ class BookmarkManager {
         // Clear existing options
         selectElement.innerHTML = '';
 
-        // Sort groups with ungrouped first
+        // Sort groups by order, with ungrouped first
         const sortedGroups = [...this.groups].sort((a, b) => {
             if (a.id === 'ungrouped') return -1;
             if (b.id === 'ungrouped') return 1;
-            return a.name.localeCompare(b.name);
+            return (a.order || 0) - (b.order || 0);
         });
 
         // Add options for each group
@@ -1683,7 +1755,7 @@ class BookmarkManager {
         console.log('Drag ended');
     }
 
-    handleGroupDragOver(e, targetGroupId) {
+    handleURLToGroupDragOver(e, targetGroupId) {
         e.preventDefault(); // Allow drop
 
         // Only allow drop if we have a dragged URL and it's not the same group
@@ -1694,7 +1766,7 @@ class BookmarkManager {
         }
     }
 
-    handleGroupDragEnter(e, targetGroupId) {
+    handleURLToGroupDragEnter(e, targetGroupId) {
         e.preventDefault();
 
         // Add visual feedback if valid drop target
@@ -1703,14 +1775,14 @@ class BookmarkManager {
         }
     }
 
-    handleGroupDragLeave(e) {
+    handleURLToGroupDragLeave(e) {
         // Remove visual feedback only if leaving the header element itself
         if (!e.currentTarget.contains(e.relatedTarget)) {
             e.currentTarget.classList.remove('drag-over');
         }
     }
 
-    async handleGroupDrop(e, targetGroupId) {
+    async handleURLToGroupDrop(e, targetGroupId) {
         e.preventDefault();
 
         try {
@@ -1758,6 +1830,267 @@ class BookmarkManager {
             this.showError('Failed to move URL to group');
             this.hideLoading();
         }
+    }
+
+    // Unified Drag and Drop Event Handlers
+    handleUnifiedDragOver(e, targetGroupId) {
+        e.preventDefault();
+
+        // Debug logging
+        console.log('Unified dragover:', {
+            targetGroupId,
+            draggedGroup: this.draggedGroup?.name,
+            draggedURL: this.draggedURL?.title
+        });
+
+        // Determine what type of drag operation this is
+        if (this.draggedGroup) {
+            // Group reordering operation
+            console.log('Routing to group reorder dragover');
+            this.handleGroupReorderDragOver(e, targetGroupId);
+        } else if (this.draggedURL) {
+            // URL to group assignment operation
+            console.log('Routing to URL-to-group dragover');
+            this.handleURLToGroupDragOver(e, targetGroupId);
+        }
+    }
+
+    handleUnifiedDrop(e, targetGroupId) {
+        e.preventDefault();
+
+        // Debug logging
+        console.log('Unified drop:', {
+            targetGroupId,
+            draggedGroup: this.draggedGroup?.name,
+            draggedURL: this.draggedURL?.title
+        });
+
+        // Route to appropriate handler based on drag type
+        if (this.draggedGroup) {
+            // Group reordering operation
+            console.log('Routing to group reorder drop');
+            this.handleGroupReorderDrop(e, targetGroupId);
+        } else if (this.draggedURL) {
+            // URL to group assignment operation
+            console.log('Routing to URL-to-group drop');
+            this.handleURLToGroupDrop(e, targetGroupId);
+        }
+    }
+
+    handleUnifiedDragEnter(e, targetGroupId) {
+        e.preventDefault();
+
+        // Route to appropriate handler based on drag type
+        if (this.draggedGroup) {
+            // Group reordering operation
+            this.handleGroupReorderDragEnter(e, targetGroupId);
+        } else if (this.draggedURL) {
+            // URL to group assignment operation
+            this.handleURLToGroupDragEnter(e, targetGroupId);
+        }
+    }
+
+    handleUnifiedDragLeave(e) {
+        // Route to appropriate handler based on drag type
+        if (this.draggedGroup) {
+            // Group reordering operation
+            this.handleGroupReorderDragLeave(e);
+        } else if (this.draggedURL) {
+            // URL to group assignment operation
+            this.handleURLToGroupDragLeave(e);
+        }
+    }
+
+    // Group Reordering Drag and Drop Methods
+    handleGroupDragStart(e, group) {
+        // Store the dragged group data
+        this.draggedGroup = group;
+        e.dataTransfer.setData('text/plain', group.id);
+        e.dataTransfer.setData('application/json', JSON.stringify({
+            id: group.id,
+            name: group.name,
+            order: group.order
+        }));
+
+        // Set drag effect
+        e.dataTransfer.effectAllowed = 'move';
+
+        // Add visual feedback
+        e.target.classList.add('dragging');
+
+        console.log('Group drag started:', group.name);
+    }
+
+    handleGroupDragEnd(e) {
+        // Remove visual feedback from dragged element
+        e.target.classList.remove('dragging');
+
+        // Clear all drop zone visual states
+        document.querySelectorAll('.group-header').forEach(header => {
+            header.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        // Clear reference
+        this.draggedGroup = null;
+
+        console.log('Group drag ended');
+    }
+
+    handleGroupReorderDragOver(e, targetGroupId) {
+        e.preventDefault();
+
+        // Only handle group reordering, not URL drops
+        if (!this.draggedGroup || this.draggedGroup.id === targetGroupId) {
+            console.log('Group reorder dragover: skipping', {
+                noDraggedGroup: !this.draggedGroup,
+                sameGroup: this.draggedGroup?.id === targetGroupId
+            });
+            return;
+        }
+
+        e.dataTransfer.dropEffect = 'move';
+
+        // Determine drop position based on mouse position
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const isTopHalf = e.clientY < midpoint;
+
+        console.log('Group reorder dragover: positioning', {
+            targetGroupId,
+            draggedGroup: this.draggedGroup.name,
+            isTopHalf,
+            mouseY: e.clientY,
+            midpoint
+        });
+
+        // Clear previous drop indicators from all headers
+        document.querySelectorAll('.group-header').forEach(header => {
+            header.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        // Add appropriate drop indicator
+        if (isTopHalf) {
+            e.currentTarget.classList.add('drag-over-top');
+            console.log('Added drag-over-top to', targetGroupId);
+        } else {
+            e.currentTarget.classList.add('drag-over-bottom');
+            console.log('Added drag-over-bottom to', targetGroupId);
+        }
+    }
+
+    handleGroupReorderDragEnter(e, targetGroupId) {
+        e.preventDefault();
+        // Visual feedback is handled in dragover
+    }
+
+    handleGroupReorderDragLeave(e) {
+        // Remove drop indicators when leaving
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
+    }
+
+    async handleGroupReorderDrop(e, targetGroupId) {
+        e.preventDefault();
+
+        console.log('Group reorder drop started:', {
+            draggedGroup: this.draggedGroup?.name,
+            targetGroupId,
+            sameGroup: this.draggedGroup?.id === targetGroupId
+        });
+
+        if (!this.draggedGroup || this.draggedGroup.id === targetGroupId) {
+            console.log('Group reorder drop: skipping - no dragged group or same group');
+            return;
+        }
+
+        try {
+            // Remove visual feedback from all headers
+            document.querySelectorAll('.group-header').forEach(header => {
+                header.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+
+            // Determine drop position
+            const rect = e.currentTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            const isTopHalf = e.clientY < midpoint;
+
+            // Find target group
+            const targetGroup = this.groups.find(g => g.id === targetGroupId);
+            if (!targetGroup) {
+                console.error('Target group not found:', targetGroupId);
+                return;
+            }
+
+            console.log('Group reorder drop: positioning', {
+                targetGroup: targetGroup.name,
+                targetOrder: targetGroup.order,
+                isTopHalf,
+                mouseY: e.clientY,
+                midpoint
+            });
+
+            // Calculate new order
+            let newOrder;
+            if (isTopHalf) {
+                // Drop above target
+                newOrder = targetGroup.order - 0.5;
+            } else {
+                // Drop below target
+                newOrder = targetGroup.order + 0.5;
+            }
+
+            // Don't allow reordering above ungrouped
+            if (newOrder <= 0) {
+                newOrder = 1;
+                console.log('Adjusted newOrder to 1 to prevent going above ungrouped');
+            }
+
+            console.log('Group reorder drop: executing', {
+                draggedGroup: this.draggedGroup.name,
+                oldOrder: this.draggedGroup.order,
+                newOrder
+            });
+
+            this.showLoading(`Moving "${this.draggedGroup.name}" group...`);
+
+            // Update the dragged group's order
+            this.draggedGroup.order = newOrder;
+            this.draggedGroup.lastModified = new Date().toISOString();
+
+            // Normalize all group orders to integers
+            this.normalizeGroupOrders();
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Show success message
+            this.showMessage(`Group "${this.draggedGroup.name}" moved successfully!`);
+
+            this.hideLoading();
+
+            console.log(`Group "${this.draggedGroup.name}" moved to position ${newOrder} successfully`);
+
+        } catch (error) {
+            console.error('Error reordering group:', error);
+            this.showError('Failed to reorder group');
+            this.hideLoading();
+        }
+    }
+
+    normalizeGroupOrders() {
+        // Sort groups by current order (excluding ungrouped which stays at 0)
+        const sortableGroups = this.groups.filter(g => g.id !== 'ungrouped').sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Reassign orders starting from 1
+        sortableGroups.forEach((group, index) => {
+            group.order = index + 1;
+        });
+
+        console.log('Normalized group orders');
     }
 
     // Group Display State Management (Task 4.2)
@@ -1832,14 +2165,26 @@ class BookmarkManager {
         switch (e.key) {
             case 'ArrowDown':
                 e.preventDefault();
-                const nextIndex = (currentIndex + 1) % allHeaders.length;
-                allHeaders[nextIndex].focus();
+                // Ctrl+Shift+Down: Move group down
+                if (e.ctrlKey && e.shiftKey) {
+                    this.moveGroupDown(currentHeader.getAttribute('data-group-id'));
+                } else {
+                    // Normal navigation
+                    const nextIndex = (currentIndex + 1) % allHeaders.length;
+                    allHeaders[nextIndex].focus();
+                }
                 break;
 
             case 'ArrowUp':
                 e.preventDefault();
-                const prevIndex = currentIndex === 0 ? allHeaders.length - 1 : currentIndex - 1;
-                allHeaders[prevIndex].focus();
+                // Ctrl+Shift+Up: Move group up
+                if (e.ctrlKey && e.shiftKey) {
+                    this.moveGroupUp(currentHeader.getAttribute('data-group-id'));
+                } else {
+                    // Normal navigation
+                    const prevIndex = currentIndex === 0 ? allHeaders.length - 1 : currentIndex - 1;
+                    allHeaders[prevIndex].focus();
+                }
                 break;
 
             case 'Home':
@@ -1869,6 +2214,89 @@ class BookmarkManager {
                     this.toggleGroupExpanded(groupIdLeft);
                 }
                 break;
+        }
+    }
+
+    // Keyboard Group Reordering Methods
+    async moveGroupUp(groupId) {
+        const group = this.groups.find(g => g.id === groupId);
+        if (!group || group.protected || group.id === 'ungrouped') {
+            return; // Can't move protected groups
+        }
+
+        try {
+            // Find the group with the order just above this one
+            const sortableGroups = this.groups.filter(g => g.id !== 'ungrouped').sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentIndex = sortableGroups.findIndex(g => g.id === groupId);
+
+            if (currentIndex > 0) {
+                const targetGroup = sortableGroups[currentIndex - 1];
+
+                // Swap orders
+                const tempOrder = group.order;
+                group.order = targetGroup.order;
+                targetGroup.order = tempOrder;
+
+                group.lastModified = new Date().toISOString();
+                targetGroup.lastModified = new Date().toISOString();
+
+                // Save and update UI
+                await this.saveData();
+                this.renderURLs();
+
+                // Re-focus the moved group
+                setTimeout(() => {
+                    const movedHeader = document.querySelector(`[data-group-id="${groupId}"]`);
+                    if (movedHeader) movedHeader.focus();
+                }, 100);
+
+                this.showMessage(`Group "${group.name}" moved up`);
+                console.log(`Group "${group.name}" moved up`);
+            }
+        } catch (error) {
+            console.error('Error moving group up:', error);
+            this.showError('Failed to move group up');
+        }
+    }
+
+    async moveGroupDown(groupId) {
+        const group = this.groups.find(g => g.id === groupId);
+        if (!group || group.protected || group.id === 'ungrouped') {
+            return; // Can't move protected groups
+        }
+
+        try {
+            // Find the group with the order just below this one
+            const sortableGroups = this.groups.filter(g => g.id !== 'ungrouped').sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentIndex = sortableGroups.findIndex(g => g.id === groupId);
+
+            if (currentIndex < sortableGroups.length - 1) {
+                const targetGroup = sortableGroups[currentIndex + 1];
+
+                // Swap orders
+                const tempOrder = group.order;
+                group.order = targetGroup.order;
+                targetGroup.order = tempOrder;
+
+                group.lastModified = new Date().toISOString();
+                targetGroup.lastModified = new Date().toISOString();
+
+                // Save and update UI
+                await this.saveData();
+                this.renderURLs();
+
+                // Re-focus the moved group
+                setTimeout(() => {
+                    const movedHeader = document.querySelector(`[data-group-id="${groupId}"]`);
+                    if (movedHeader) movedHeader.focus();
+                }, 100);
+
+                this.showMessage(`Group "${group.name}" moved down`);
+                console.log(`Group "${group.name}" moved down`);
+            }
+        } catch (error) {
+            console.error('Error moving group down:', error);
+            this.showError('Failed to move group down');
         }
     }
 
