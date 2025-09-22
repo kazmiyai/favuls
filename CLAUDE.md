@@ -197,6 +197,13 @@ A Chrome extension for bookmark management with local db sync(chrome.storage.syn
 3. Data stored locally immediately
 4. On other devices, changes are synced with chrome.storage.sync.
 
+### 5.4 Start page
+1. As a user, I want to set the url of "chrome-extension://[extension_id]/startpage.html" as a startpage in the Chrome preference.
+2. As a user, I want to display the startpage when I open new browser window.
+3. The startpage will be constructed by the groups and urls, which is stored in the chrome.storage.sync.
+
+
+
 ### 1.4 Import/Export Functionality
 - **Export**: Download all data as JSON file with timestamp in filename
 - **Import**:
@@ -216,8 +223,9 @@ A Chrome extension for bookmark management with local db sync(chrome.storage.syn
   - No results message when no matches found
 - **Filtering**: Filter by group using dropdown or tabs
 
+
+
 ## 6. Future Enhancements (Optional)
-- Advanced search with regex support
 - Bulk operations for multiple URLs
 - URL categorization by domain
 - Tag-based organization system
