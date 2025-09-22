@@ -323,6 +323,7 @@ body {
     background-color: white;
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
 }
 
 .url-item:hover {
@@ -401,6 +402,97 @@ body {
 
 .url-item:hover .url-actions {
     opacity: 1;
+}
+
+/* URL Drag Handle */
+.url-drag-handle {
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    font-size: 10px;
+    color: #999;
+}
+
+.url-item:hover .url-drag-handle {
+    opacity: 0.7;
+}
+
+.url-drag-handle:hover {
+    opacity: 1;
+    background-color: rgba(74, 144, 226, 0.1);
+}
+
+.url-drag-handle:active {
+    cursor: grabbing;
+}
+
+.url-drag-handle::before {
+    content: "⋮";
+    font-size: 10px;
+    line-height: 1;
+}
+
+/* Adjust URL content to make room for drag handle */
+.url-item .url-favicon {
+    margin-left: 16px;
+}
+
+/* URL Dragging States */
+.url-item.dragging {
+    opacity: 0.7;
+    transform: rotate(1deg);
+    z-index: 1000;
+    border-color: #4A90E2;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    cursor: grabbing;
+}
+
+.url-item.drag-over-top::before,
+.url-item.drag-over-bottom::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    height: 2px;
+    background-color: #4A90E2;
+    border-radius: 1px;
+    z-index: 1001;
+}
+
+.url-item.drag-over-top::before {
+    top: -1px;
+}
+
+.url-item.drag-over-bottom::after {
+    bottom: -1px;
+}
+
+/* URL Drop Zone Indicators */
+.url-drop-zone {
+    height: 4px;
+    margin: 1px 12px;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    opacity: 0;
+    background-color: rgba(74, 144, 226, 0.3);
+    border: 1px dashed rgba(74, 144, 226, 0.5);
+}
+
+.url-drop-zone.active {
+    opacity: 1;
+    height: 8px;
+    background-color: rgba(74, 144, 226, 0.4);
+    border-color: #4A90E2;
 }
 
 .url-action-btn {

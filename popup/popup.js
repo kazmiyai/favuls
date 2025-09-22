@@ -16,6 +16,7 @@ class URLDataModel {
         this.domain = data.domain || this.extractDomain(this.url);
         this.favicon = data.favicon || this.generateFaviconUrl(this.domain);
         this.tags = data.tags || [];
+        this.order = data.order !== undefined ? data.order : Date.now(); // Use timestamp as default order
         this.isValidated = false;
     }
 
@@ -78,7 +79,8 @@ class URLDataModel {
             lastModified: this.lastModified,
             domain: this.domain,
             favicon: this.favicon,
-            tags: this.tags
+            tags: this.tags,
+            order: this.order
         };
     }
 
@@ -257,6 +259,9 @@ class BookmarkManager {
 
             // Initialize group orders for existing groups
             this.initializeGroupOrders();
+
+            // Initialize URL orders for existing URLs
+            this.initializeURLOrders();
 
             // Save if we made any fixes or if this is first time setup
             if (this.lastDataValidation && this.lastDataValidation.hasChanges) {
@@ -611,6 +616,49 @@ class BookmarkManager {
         }
     }
 
+    initializeURLOrders() {
+        let hasChanges = false;
+
+        // Group URLs by groupId for processing
+        const urlsByGroup = {};
+        this.urls.forEach(url => {
+            if (!urlsByGroup[url.groupId]) {
+                urlsByGroup[url.groupId] = [];
+            }
+            urlsByGroup[url.groupId].push(url);
+        });
+
+        // Process each group separately
+        Object.keys(urlsByGroup).forEach(groupId => {
+            const groupUrls = urlsByGroup[groupId];
+            let orderAssigned = false;
+
+            // Check if any URLs in this group lack order
+            groupUrls.forEach((url, index) => {
+                if (url.order === undefined || url.order === null) {
+                    // Assign order based on creation time, with small increments for same timestamp
+                    const baseTime = new Date(url.created || url.timestamp).getTime();
+                    url.order = baseTime + index; // Add index to prevent collisions
+                    hasChanges = true;
+                    orderAssigned = true;
+                }
+            });
+
+            if (orderAssigned) {
+                console.log(`Initialized URL orders for group ${groupId}: ${groupUrls.length} URLs`);
+            }
+        });
+
+        if (hasChanges) {
+            console.log('Initialized URL orders for existing URLs');
+            // Mark that we have changes that need to be saved
+            if (!this.lastDataValidation) {
+                this.lastDataValidation = { hasChanges: false };
+            }
+            this.lastDataValidation.hasChanges = true;
+        }
+    }
+
     getNextGroupOrder() {
         if (this.groups.length === 0) {
             return 1; // First non-ungrouped group gets order 1
@@ -806,8 +854,11 @@ class BookmarkManager {
         const isExpanded = this.isGroupExpanded(groupId);
         container.classList.add(isExpanded ? 'group-expanded' : 'group-collapsed');
 
+        // Sort URLs by order within the group
+        const sortedUrls = urls.sort((a, b) => (a.order || 0) - (b.order || 0));
+
         // Add URLs to container
-        urls.forEach(url => {
+        sortedUrls.forEach(url => {
             const urlElement = this.createURLElement(url);
             container.appendChild(urlElement);
         });
@@ -821,7 +872,7 @@ class BookmarkManager {
         urlElement.setAttribute('data-url-id', urlData.id);
         urlElement.setAttribute('tabindex', '0');
         urlElement.setAttribute('role', 'listitem');
-        urlElement.setAttribute('aria-label', `Bookmark: ${urlData.title}`);
+        urlElement.setAttribute('aria-label', `Bookmark: ${urlData.title}. Use Ctrl+Shift+Arrow keys to reorder or move between groups`);
 
         // Task 4.3: Make URLs draggable for group assignment
         urlElement.setAttribute('draggable', 'true');
@@ -834,6 +885,7 @@ class BookmarkManager {
 
         // Create simplified display for Task 2.4 requirements
         urlElement.innerHTML = `
+            <div class="url-drag-handle" title="Drag to reorder"></div>
             <img class="url-favicon"
                  src="${faviconUrl}"
                  alt="Favicon for ${domain}"
@@ -859,17 +911,37 @@ class BookmarkManager {
             }
         });
 
-        // Add keyboard navigation
+        // Add keyboard navigation and reordering shortcuts
         urlElement.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 if (!e.target.closest('.url-actions')) {
                     this.openURL(urlData.url);
                 }
+            } else if (e.ctrlKey && e.shiftKey) {
+                // URL reordering keyboard shortcuts
+                switch (e.key) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        this.moveURLUp(urlData.id);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        this.moveURLDown(urlData.id);
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        this.moveURLToPreviousGroup(urlData.id);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        this.moveURLToNextGroup(urlData.id);
+                        break;
+                }
             }
         });
 
-        // Task 4.3: Add drag-and-drop event listeners
+        // Add drag-and-drop event listeners for both group assignment and URL reordering
         urlElement.addEventListener('dragstart', (e) => {
             this.handleURLDragStart(e, urlData);
         });
@@ -877,6 +949,31 @@ class BookmarkManager {
         urlElement.addEventListener('dragend', (e) => {
             this.handleURLDragEnd(e);
         });
+
+        // Add URL-to-URL reordering support
+        urlElement.addEventListener('dragover', (e) => {
+            this.handleURLReorderDragOver(e, urlData);
+        });
+
+        urlElement.addEventListener('drop', (e) => {
+            this.handleURLReorderDrop(e, urlData);
+        });
+
+        urlElement.addEventListener('dragenter', (e) => {
+            this.handleURLReorderDragEnter(e, urlData);
+        });
+
+        urlElement.addEventListener('dragleave', (e) => {
+            this.handleURLReorderDragLeave(e);
+        });
+
+        // Prevent drag handle clicks from opening URL
+        const dragHandle = urlElement.querySelector('.url-drag-handle');
+        if (dragHandle) {
+            dragHandle.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
 
         return urlElement;
     }
@@ -1749,10 +1846,325 @@ class BookmarkManager {
             header.classList.remove('drag-over');
         });
 
+        // Clear all URL drag states
+        document.querySelectorAll('.url-item').forEach(item => {
+            item.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
         // Clear reference
         this.draggedURL = null;
 
         console.log('Drag ended');
+    }
+
+    // URL-to-URL Reordering Drag and Drop Methods
+    handleURLReorderDragOver(e, targetURLData) {
+        e.preventDefault();
+
+        // Only handle URL reordering, not URL-to-group assignment
+        if (!this.draggedURL || this.draggedURL.id === targetURLData.id) {
+            return;
+        }
+
+        // Only allow reordering within the same group
+        if (this.draggedURL.groupId !== targetURLData.groupId) {
+            return;
+        }
+
+        e.dataTransfer.dropEffect = 'move';
+
+        // Determine drop position based on mouse position
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const isTopHalf = e.clientY < midpoint;
+
+        console.log('URL reorder dragover:', {
+            draggedURL: this.draggedURL.title,
+            targetURL: targetURLData.title,
+            isTopHalf,
+            mouseY: e.clientY,
+            midpoint
+        });
+
+        // Clear previous drop indicators from all URL items
+        document.querySelectorAll('.url-item').forEach(item => {
+            item.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        // Add appropriate drop indicator
+        if (isTopHalf) {
+            e.currentTarget.classList.add('drag-over-top');
+        } else {
+            e.currentTarget.classList.add('drag-over-bottom');
+        }
+    }
+
+    handleURLReorderDragEnter(e, targetURLData) {
+        e.preventDefault();
+        // Visual feedback is handled in dragover
+    }
+
+    handleURLReorderDragLeave(e) {
+        // Remove drop indicators when leaving
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
+    }
+
+    async handleURLReorderDrop(e, targetURLData) {
+        e.preventDefault();
+
+        console.log('URL reorder drop started:', {
+            draggedURL: this.draggedURL?.title,
+            targetURL: targetURLData.title,
+            sameURL: this.draggedURL?.id === targetURLData.id,
+            sameGroup: this.draggedURL?.groupId === targetURLData.groupId
+        });
+
+        if (!this.draggedURL || this.draggedURL.id === targetURLData.id) {
+            console.log('URL reorder drop: skipping - no dragged URL or same URL');
+            return;
+        }
+
+        // Only allow reordering within the same group
+        if (this.draggedURL.groupId !== targetURLData.groupId) {
+            console.log('URL reorder drop: skipping - different groups');
+            return;
+        }
+
+        try {
+            // Remove visual feedback from all URL items
+            document.querySelectorAll('.url-item').forEach(item => {
+                item.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+
+            // Determine drop position
+            const rect = e.currentTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            const isTopHalf = e.clientY < midpoint;
+
+            console.log('URL reorder drop: positioning', {
+                targetURL: targetURLData.title,
+                targetOrder: targetURLData.order,
+                isTopHalf,
+                mouseY: e.clientY,
+                midpoint
+            });
+
+            // Calculate new order
+            let newOrder;
+            if (isTopHalf) {
+                // Drop above target
+                newOrder = targetURLData.order - 0.5;
+            } else {
+                // Drop below target
+                newOrder = targetURLData.order + 0.5;
+            }
+
+            console.log('URL reorder drop: executing', {
+                draggedURL: this.draggedURL.title,
+                oldOrder: this.draggedURL.order,
+                newOrder
+            });
+
+            this.showLoading(`Moving "${this.draggedURL.title}"...`);
+
+            // Update the dragged URL's order
+            this.draggedURL.order = newOrder;
+            this.draggedURL.lastModified = new Date().toISOString();
+
+            // Normalize URL orders within the group
+            this.normalizeURLOrdersInGroup(this.draggedURL.groupId);
+
+            // Save to storage
+            await this.saveData();
+
+            // Update UI
+            this.renderURLs();
+
+            // Show success message
+            this.showMessage(`"${this.draggedURL.title}" moved successfully!`);
+
+            this.hideLoading();
+
+            console.log(`URL "${this.draggedURL.title}" moved to position ${newOrder} successfully`);
+
+        } catch (error) {
+            console.error('Error reordering URL:', error);
+            this.showError('Failed to reorder URL');
+            this.hideLoading();
+        }
+    }
+
+    normalizeURLOrdersInGroup(groupId) {
+        // Get all URLs in the group and sort by current order
+        const groupURLs = this.urls.filter(url => url.groupId === groupId).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Reassign orders starting from 1
+        groupURLs.forEach((url, index) => {
+            url.order = index + 1;
+        });
+
+        console.log(`Normalized URL orders in group ${groupId}: ${groupURLs.length} URLs`);
+    }
+
+    // Keyboard URL Reordering Methods
+    async moveURLUp(urlId) {
+        const url = this.urls.find(u => u.id === urlId);
+        if (!url) return;
+
+        try {
+            // Find all URLs in the same group, sorted by order
+            const groupURLs = this.urls.filter(u => u.groupId === url.groupId).sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentIndex = groupURLs.findIndex(u => u.id === urlId);
+
+            if (currentIndex > 0) {
+                const targetURL = groupURLs[currentIndex - 1];
+
+                // Swap orders
+                const tempOrder = url.order;
+                url.order = targetURL.order;
+                targetURL.order = tempOrder;
+
+                url.lastModified = new Date().toISOString();
+                targetURL.lastModified = new Date().toISOString();
+
+                // Save and update UI
+                await this.saveData();
+                this.renderURLs();
+
+                // Re-focus the moved URL
+                setTimeout(() => {
+                    const movedURL = document.querySelector(`[data-url-id="${urlId}"]`);
+                    if (movedURL) movedURL.focus();
+                }, 100);
+
+                this.showMessage(`"${url.title}" moved up`);
+                console.log(`URL "${url.title}" moved up`);
+            }
+        } catch (error) {
+            console.error('Error moving URL up:', error);
+            this.showError('Failed to move URL up');
+        }
+    }
+
+    async moveURLDown(urlId) {
+        const url = this.urls.find(u => u.id === urlId);
+        if (!url) return;
+
+        try {
+            // Find all URLs in the same group, sorted by order
+            const groupURLs = this.urls.filter(u => u.groupId === url.groupId).sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentIndex = groupURLs.findIndex(u => u.id === urlId);
+
+            if (currentIndex < groupURLs.length - 1) {
+                const targetURL = groupURLs[currentIndex + 1];
+
+                // Swap orders
+                const tempOrder = url.order;
+                url.order = targetURL.order;
+                targetURL.order = tempOrder;
+
+                url.lastModified = new Date().toISOString();
+                targetURL.lastModified = new Date().toISOString();
+
+                // Save and update UI
+                await this.saveData();
+                this.renderURLs();
+
+                // Re-focus the moved URL
+                setTimeout(() => {
+                    const movedURL = document.querySelector(`[data-url-id="${urlId}"]`);
+                    if (movedURL) movedURL.focus();
+                }, 100);
+
+                this.showMessage(`"${url.title}" moved down`);
+                console.log(`URL "${url.title}" moved down`);
+            }
+        } catch (error) {
+            console.error('Error moving URL down:', error);
+            this.showError('Failed to move URL down');
+        }
+    }
+
+    async moveURLToPreviousGroup(urlId) {
+        const url = this.urls.find(u => u.id === urlId);
+        if (!url) return;
+
+        try {
+            // Find all groups sorted by order
+            const sortedGroups = this.groups.sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentGroupIndex = sortedGroups.findIndex(g => g.id === url.groupId);
+
+            if (currentGroupIndex > 0) {
+                const targetGroup = sortedGroups[currentGroupIndex - 1];
+
+                // Get the maximum order in the target group
+                const targetGroupURLs = this.urls.filter(u => u.groupId === targetGroup.id);
+                const maxOrder = targetGroupURLs.length > 0 ? Math.max(...targetGroupURLs.map(u => u.order || 0)) : 0;
+
+                // Move URL to target group
+                url.groupId = targetGroup.id;
+                url.order = maxOrder + 1;
+                url.lastModified = new Date().toISOString();
+
+                // Save and update UI
+                await this.saveData();
+                this.renderURLs();
+
+                // Re-focus the moved URL
+                setTimeout(() => {
+                    const movedURL = document.querySelector(`[data-url-id="${urlId}"]`);
+                    if (movedURL) movedURL.focus();
+                }, 100);
+
+                this.showMessage(`"${url.title}" moved to ${targetGroup.name}`);
+                console.log(`URL "${url.title}" moved to group ${targetGroup.name}`);
+            }
+        } catch (error) {
+            console.error('Error moving URL to previous group:', error);
+            this.showError('Failed to move URL to previous group');
+        }
+    }
+
+    async moveURLToNextGroup(urlId) {
+        const url = this.urls.find(u => u.id === urlId);
+        if (!url) return;
+
+        try {
+            // Find all groups sorted by order
+            const sortedGroups = this.groups.sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentGroupIndex = sortedGroups.findIndex(g => g.id === url.groupId);
+
+            if (currentGroupIndex < sortedGroups.length - 1) {
+                const targetGroup = sortedGroups[currentGroupIndex + 1];
+
+                // Get the maximum order in the target group
+                const targetGroupURLs = this.urls.filter(u => u.groupId === targetGroup.id);
+                const maxOrder = targetGroupURLs.length > 0 ? Math.max(...targetGroupURLs.map(u => u.order || 0)) : 0;
+
+                // Move URL to target group
+                url.groupId = targetGroup.id;
+                url.order = maxOrder + 1;
+                url.lastModified = new Date().toISOString();
+
+                // Save and update UI
+                await this.saveData();
+                this.renderURLs();
+
+                // Re-focus the moved URL
+                setTimeout(() => {
+                    const movedURL = document.querySelector(`[data-url-id="${urlId}"]`);
+                    if (movedURL) movedURL.focus();
+                }, 100);
+
+                this.showMessage(`"${url.title}" moved to ${targetGroup.name}`);
+                console.log(`URL "${url.title}" moved to group ${targetGroup.name}`);
+            }
+        } catch (error) {
+            console.error('Error moving URL to next group:', error);
+            this.showError('Failed to move URL to next group');
+        }
     }
 
     handleURLToGroupDragOver(e, targetGroupId) {
