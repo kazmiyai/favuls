@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Export Format</title>
+</head>
+<body>
+    <h1>Export Format Test</h1>
+    <pre id="output"></pre>
+
+    <script>
+        // Test the export format with sample data
+        const testData = {
+            metadata: {
+                version: "1.0",
+                exportDate: new Date().toISOString(),
+                source: "FavURL Extension",
+                totalGroups: 2,
+                totalUrls: 3
+            },
+            groups: [
+                {
+                    id: "ungrouped",
+                    name: "Ungrouped",
+                    created: "2025-09-20T08:00:00.000Z",
+                    lastModified: "2025-09-22T15:30:00.000Z",
+                    isDefault: true,
+                    protected: true,
+                    color: "#666666",
+                    description: "Default group for uncategorized bookmarks",
+                    urlCount: 1,
+                    order: 0
+                },
+                {
+                    id: "group_abc123",
+                    name: "Development",
+                    created: "2025-09-21T10:15:00.000Z",
+                    lastModified: "2025-09-22T14:20:00.000Z",
+                    isDefault: false,
+                    protected: false,
+                    color: "#2196f3",
+                    description: "Programming resources and tools",
+                    urlCount: 2,
+                    order: 1
+                }
+            ],
+            urls: [
+                {
+                    id: "url_def456",
+                    url: "https://github.com",
+                    title: "GitHub",
+                    timestamp: "2025-09-22T16:45:00.000Z",
+                    groupId: "group_abc123",
+                    created: "2025-09-22T16:45:00.000Z",
+                    lastModified: "2025-09-22T16:45:00.000Z",
+                    domain: "github.com",
+                    favicon: "https://www.google.com/s2/favicons?domain=github.com&sz=16",
+                    tags: [],
+                    order: 1
+                },
+                {
+                    id: "url_ghi789",
+                    url: "https://stackoverflow.com",
+                    title: "Stack Overflow",
+                    timestamp: "2025-09-22T17:00:00.000Z",
+                    groupId: "group_abc123",
+                    created: "2025-09-22T17:00:00.000Z",
+                    lastModified: "2025-09-22T17:00:00.000Z",
+                    domain: "stackoverflow.com",
+                    favicon: "https://www.google.com/s2/favicons?domain=stackoverflow.com&sz=16",
+                    tags: [],
+                    order: 2
+                },
+                {
+                    id: "url_jkl012",
+                    url: "https://google.com",
+                    title: "Google",
+                    timestamp: "2025-09-22T18:00:00.000Z",
+                    groupId: "ungrouped",
+                    created: "2025-09-22T18:00:00.000Z",
+                    lastModified: "2025-09-22T18:00:00.000Z",
+                    domain: "google.com",
+                    favicon: "https://www.google.com/s2/favicons?domain=google.com&sz=16",
+                    tags: [],
+                    order: 3
+                }
+            ]
+        };
+
+        document.getElementById('output').textContent = JSON.stringify(testData, null, 2);
+
+        console.log('Export format test completed');
+        console.log('Total size:', JSON.stringify(testData).length, 'bytes');
+    </script>
+</body>
+</html>

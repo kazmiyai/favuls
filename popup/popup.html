@@ -13,16 +13,39 @@
             <h1 class="header-title">FavURL</h1>
             <p class="header-subtitle">Bookmark Manager</p>
 
-            <!-- Start Page Toggle -->
-            <div class="start-page-toggle">
-                <label class="toggle-label" for="startPageToggle">
-                    <span class="toggle-text">Enable Start Page</span>
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="startPageToggle" class="toggle-input" checked>
-                        <span class="toggle-slider"></span>
+            <!-- Header Controls -->
+            <div class="header-controls">
+                <!-- Start Page Toggle -->
+                <div class="start-page-toggle">
+                    <label class="toggle-label" for="startPageToggle">
+                        <span class="toggle-text">Enable Start Page</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="startPageToggle" class="toggle-input" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Menu Button -->
+                <div class="menu-container">
+                    <button class="menu-button" id="menuButton" aria-label="Options menu" aria-expanded="false">
+                        <span class="menu-icon">⋮</span>
+                    </button>
+                    <div class="menu-dropdown" id="menuDropdown" role="menu" aria-hidden="true">
+                        <button class="menu-item" id="exportData" role="menuitem">
+                            <span class="menu-item-icon">⬇</span>
+                            <span class="menu-item-text">Export Data</span>
+                        </button>
+                        <button class="menu-item" id="importData" role="menuitem">
+                            <span class="menu-item-icon">⬆</span>
+                            <span class="menu-item-text">Import Data</span>
+                        </button>
                     </div>
-                </label>
+                </div>
             </div>
+
+            <!-- Hidden file input for import -->
+            <input type="file" id="importFileInput" accept=".json" style="display: none;" aria-label="Select JSON file to import">
         </header>
 
         <!-- Main Content -->
@@ -264,6 +287,60 @@
         <button type="button" class="btn btn-secondary" id="cancelEditURL">Cancel</button>
         <button type="button" class="btn btn-tertiary" id="deleteEditURL">Delete</button>
         <button type="submit" class="btn btn-primary" form="editURLForm" id="saveEditURL">Save Changes</button>
+    </template>
+
+    <!-- Import Confirmation Modal Template (hidden) -->
+    <template id="importConfirmationModalTemplate">
+        <form class="import-confirmation-form" id="importConfirmationForm">
+            <div class="import-summary">
+                <h3>Import Data Summary</h3>
+                <div class="import-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Groups:</span>
+                        <span class="stat-value" id="importGroupCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">URLs:</span>
+                        <span class="stat-value" id="importUrlCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="import-options">
+                <h4>How would you like to import this data?</h4>
+
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="importMode" value="replace" id="importModeReplace" checked>
+                        <span class="radio-label">
+                            <strong>Replace All Data</strong>
+                            <small>Completely replace your existing bookmarks with the imported data. Any bookmarks not in the import file will be deleted.</small>
+                        </span>
+                    </label>
+
+                    <label class="radio-option">
+                        <input type="radio" name="importMode" value="merge" id="importModeMerge">
+                        <span class="radio-label">
+                            <strong>Merge Data</strong>
+                            <small>Add imported bookmarks to your existing ones. Duplicates will be updated if they have newer timestamps.</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="import-warning" id="replaceWarning">
+                <div class="warning-icon">⚠️</div>
+                <div class="warning-text">
+                    <strong>Warning:</strong> Replace mode will permanently delete all existing bookmarks that are not in the import file. This action cannot be undone.
+                </div>
+            </div>
+        </form>
+    </template>
+
+    <!-- Import Confirmation Modal Footer Template (hidden) -->
+    <template id="importConfirmationModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="cancelImport">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="importConfirmationForm" id="confirmImport">Import Data</button>
     </template>
 
     <!-- Loading Spinner (placeholder for future implementation) -->
