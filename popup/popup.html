@@ -289,6 +289,60 @@
         <button type="submit" class="btn btn-primary" form="editURLForm" id="saveEditURL">Save Changes</button>
     </template>
 
+    <!-- Import Confirmation Modal Template (hidden) -->
+    <template id="importConfirmationModalTemplate">
+        <form class="import-confirmation-form" id="importConfirmationForm">
+            <div class="import-summary">
+                <h3>Import Data Summary</h3>
+                <div class="import-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Groups:</span>
+                        <span class="stat-value" id="importGroupCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">URLs:</span>
+                        <span class="stat-value" id="importUrlCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="import-options">
+                <h4>How would you like to import this data?</h4>
+
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="importMode" value="replace" id="importModeReplace" checked>
+                        <span class="radio-label">
+                            <strong>Replace All Data</strong>
+                            <small>Completely replace your existing bookmarks with the imported data. Any bookmarks not in the import file will be deleted.</small>
+                        </span>
+                    </label>
+
+                    <label class="radio-option">
+                        <input type="radio" name="importMode" value="merge" id="importModeMerge">
+                        <span class="radio-label">
+                            <strong>Merge Data</strong>
+                            <small>Add imported bookmarks to your existing ones. Duplicates will be updated if they have newer timestamps.</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="import-warning" id="replaceWarning">
+                <div class="warning-icon">⚠️</div>
+                <div class="warning-text">
+                    <strong>Warning:</strong> Replace mode will permanently delete all existing bookmarks that are not in the import file. This action cannot be undone.
+                </div>
+            </div>
+        </form>
+    </template>
+
+    <!-- Import Confirmation Modal Footer Template (hidden) -->
+    <template id="importConfirmationModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="cancelImport">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="importConfirmationForm" id="confirmImport">Import Data</button>
+    </template>
+
     <!-- Loading Spinner (placeholder for future implementation) -->
     <div class="loading-overlay" id="loadingOverlay" style="display: none;" aria-hidden="true">
         <div class="loading-spinner" aria-label="Loading"></div>

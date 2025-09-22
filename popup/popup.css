@@ -1197,6 +1197,143 @@ body {
     border: 0;
 }
 
+/* Import Confirmation Modal */
+.import-confirmation-form {
+    max-width: 100%;
+}
+
+.import-summary {
+    margin-bottom: 20px;
+    padding: 16px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.import-summary h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.import-stats {
+    display: flex;
+    gap: 20px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-label {
+    font-weight: 500;
+    color: #666;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #2196f3;
+    font-size: 16px;
+}
+
+.import-options {
+    margin-bottom: 20px;
+}
+
+.import-options h4 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.radio-option:hover {
+    border-color: #c0c0c0;
+    background-color: #fafafa;
+}
+
+.radio-option input[type="radio"] {
+    margin: 2px 0 0 0;
+    cursor: pointer;
+}
+
+.radio-option input[type="radio"]:checked + .radio-label {
+    color: #333;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+    border-color: #2196f3;
+    background-color: #f3f8ff;
+}
+
+.radio-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.radio-label strong {
+    font-weight: 600;
+    color: #333;
+}
+
+.radio-label small {
+    color: #666;
+    line-height: 1.4;
+}
+
+.import-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.import-warning.hidden {
+    display: none !important;
+}
+
+.warning-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.warning-text {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.warning-text strong {
+    color: #856404;
+    font-weight: 600;
+}
+
 /* High contrast mode support */
 @media (prefers-contrast: high) {
     .btn-primary {

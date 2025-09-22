@@ -3030,6 +3030,8 @@ class BookmarkManager {
         if (!file) return;
 
         try {
+            console.log('Starting import file handling:', file.name);
+
             // Validate file type
             if (!file.name.toLowerCase().endsWith('.json')) {
                 this.showToast('Please select a JSON file.');
@@ -3044,12 +3046,15 @@ class BookmarkManager {
 
             // Read file content
             const fileContent = await this.readFileAsText(file);
+            console.log('File content read successfully, length:', fileContent.length);
 
             // Parse JSON
             let importData;
             try {
                 importData = JSON.parse(fileContent);
+                console.log('JSON parsed successfully:', importData);
             } catch (parseError) {
+                console.error('JSON parse error:', parseError);
                 this.showToast('Invalid JSON file. Please check the file format.');
                 return;
             }
@@ -3057,9 +3062,12 @@ class BookmarkManager {
             // Validate import data structure
             const validation = this.validateImportData(importData);
             if (!validation.valid) {
+                console.error('Validation failed:', validation.error);
                 this.showToast(`Import validation failed: ${validation.error}`);
                 return;
             }
+
+            console.log('Validation passed, showing confirmation dialog');
 
             // Show confirmation dialog
             this.showImportConfirmation(importData);
@@ -3118,22 +3126,100 @@ class BookmarkManager {
     }
 
     showImportConfirmation(importData) {
-        const { groups, urls } = importData;
-        const groupCount = groups.length;
-        const urlCount = urls.length;
+        try {
+            const { groups, urls } = importData;
+            const groupCount = groups.length;
+            const urlCount = urls.length;
 
-        const confirmMessage = `
-            This will import ${groupCount} group(s) and ${urlCount} URL(s).
+            // Store import data for later use
+            this.pendingImportData = importData;
 
-            Your existing data will be merged with the imported data.
-            Duplicate URLs will be updated if they have newer timestamps.
+            // Get templates
+            const template = document.getElementById('importConfirmationModalTemplate');
+            const footerTemplate = document.getElementById('importConfirmationModalFooterTemplate');
 
-            Do you want to continue?
-        `;
+            if (!template || !footerTemplate) {
+                console.error('Import confirmation templates not found');
+                // Fallback to simple confirm dialog
+                const confirmMessage = `Import ${groupCount} group(s) and ${urlCount} URL(s)?\n\nChoose:\nOK = Replace all data (deletes items not in import)\nCancel = Cancel import`;
+                if (confirm(confirmMessage)) {
+                    this.processReplaceImport(importData);
+                }
+                return;
+            }
 
-        if (confirm(confirmMessage.trim())) {
-            this.processImport(importData);
+            // Clone template content
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Set up modal content before opening
+            const groupCountElement = modalBody.getElementById('importGroupCount');
+            const urlCountElement = modalBody.getElementById('importUrlCount');
+
+            if (groupCountElement) groupCountElement.textContent = groupCount;
+            if (urlCountElement) urlCountElement.textContent = urlCount;
+
+            // Open modal
+            this.openModal('Import Data Confirmation', modalBody, modalFooter);
+
+            // Set up event listeners after modal is opened
+            setTimeout(() => {
+                this.setupImportConfirmationListeners();
+            }, 100);
+
+        } catch (error) {
+            console.error('Error opening import confirmation modal:', error);
+            // Fallback to simple confirm dialog
+            const confirmMessage = `Import ${importData.groups.length} group(s) and ${importData.urls.length} URL(s)?\n\nThis will REPLACE all existing data. Continue?`;
+            if (confirm(confirmMessage)) {
+                this.processReplaceImport(importData);
+            }
         }
+    }
+
+    setupImportConfirmationListeners() {
+        const replaceRadio = document.getElementById('importModeReplace');
+        const mergeRadio = document.getElementById('importModeMerge');
+        const warning = document.getElementById('replaceWarning');
+        const confirmBtn = document.getElementById('confirmImport');
+        const cancelBtn = document.getElementById('cancelImport');
+
+        if (!replaceRadio || !mergeRadio || !warning || !confirmBtn || !cancelBtn) {
+            console.error('Import confirmation elements not found');
+            return;
+        }
+
+        const updateWarningVisibility = () => {
+            if (replaceRadio.checked) {
+                warning.classList.remove('hidden');
+            } else {
+                warning.classList.add('hidden');
+            }
+        };
+
+        // Initial state
+        updateWarningVisibility();
+
+        // Add event listeners
+        replaceRadio.addEventListener('change', updateWarningVisibility);
+        mergeRadio.addEventListener('change', updateWarningVisibility);
+
+        confirmBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const selectedMode = document.querySelector('input[name="importMode"]:checked')?.value || 'replace';
+            this.closeModal();
+
+            if (selectedMode === 'replace') {
+                this.processReplaceImport(this.pendingImportData);
+            } else {
+                this.processImport(this.pendingImportData);
+            }
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            this.closeModal();
+            this.pendingImportData = null;
+        });
     }
 
     async processImport(importData) {
@@ -3165,6 +3251,34 @@ class BookmarkManager {
         } catch (error) {
             console.error('Import processing failed:', error);
             this.showToast('Import failed. Please try again.');
+        }
+    }
+
+    async processReplaceImport(importData) {
+        try {
+            // Validate import data one more time
+            const validation = this.validateImportData(importData);
+            if (!validation.valid) {
+                this.showToast(`Import validation failed: ${validation.error}`);
+                return;
+            }
+
+            // Directly replace all data with import data
+            await chrome.storage.sync.set({
+                groups: importData.groups,
+                urls: importData.urls
+            });
+
+            // Reload data and UI
+            await this.loadData();
+            this.renderURLs();
+
+            this.showToast(`Data replaced successfully: ${importData.urls.length} URLs and ${importData.groups.length} groups imported.`);
+            console.log('Replace import completed successfully');
+
+        } catch (error) {
+            console.error('Replace import processing failed:', error);
+            this.showToast('Replace import failed. Please try again.');
         }
     }
 
