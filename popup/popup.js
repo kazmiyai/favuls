@@ -169,6 +169,8 @@ class BookmarkManager {
         this.lastDataValidation = null;
         // Task 4.2: Group display state management
         this.groupExpandedState = {}; // Track which groups are expanded/collapsed
+        // Start page toggle state
+        this.startPageEnabled = true; // Default to enabled
         this.init();
     }
 
@@ -181,6 +183,7 @@ class BookmarkManager {
         await this.updateStorageQuota();
 
         this.setupEventListeners();
+        this.initializeToggle();
         this.renderURLs();
     }
 
@@ -225,11 +228,14 @@ class BookmarkManager {
     // Data Management (Task 3.3: Enhanced with data models)
     async loadData() {
         try {
-            const result = await chrome.storage.sync.get(['urls', 'groups', 'dataModelVersion']);
+            const result = await chrome.storage.sync.get(['urls', 'groups', 'dataModelVersion', 'startPageEnabled']);
 
             // Convert loaded data to data model instances
             this.urls = (result.urls || []).map(urlData => URLDataModel.fromJSON(urlData));
             this.groups = (result.groups || []).map(groupData => GroupDataModel.fromJSON(groupData));
+
+            // Load start page toggle state (default to true for existing users)
+            this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
 
             // Check for data model version compatibility
             if (result.dataModelVersion && result.dataModelVersion !== this.dataModelVersion) {
@@ -275,7 +281,8 @@ class BookmarkManager {
                 groups: this.groups.map(group => group.toJSON()),
                 lastUpdated: new Date().toISOString(),
                 version: '1.0',
-                dataModelVersion: this.dataModelVersion
+                dataModelVersion: this.dataModelVersion,
+                startPageEnabled: this.startPageEnabled
             };
 
             await chrome.storage.sync.set(serializedData);
@@ -346,6 +353,44 @@ class BookmarkManager {
         const urlList = document.getElementById('urlList');
         if (urlList) {
             urlList.addEventListener('click', (e) => this.handleURLClick(e));
+        }
+
+        // Start page toggle event listener
+        const startPageToggle = document.getElementById('startPageToggle');
+        if (startPageToggle) {
+            startPageToggle.addEventListener('change', (e) => this.handleStartPageToggle(e));
+        }
+    }
+
+    // Initialize Start Page Toggle
+    initializeToggle() {
+        const startPageToggle = document.getElementById('startPageToggle');
+        if (startPageToggle) {
+            // Set the toggle state based on loaded data
+            startPageToggle.checked = this.startPageEnabled;
+        }
+    }
+
+    // Handle Start Page Toggle Change
+    async handleStartPageToggle(e) {
+        try {
+            this.startPageEnabled = e.target.checked;
+
+            // Save the new state
+            await this.saveData();
+
+            // Show feedback message
+            const message = this.startPageEnabled
+                ? 'Start page enabled - bookmarks will be shown on new tabs'
+                : 'Start page disabled - new tabs will show a blank page';
+            this.showMessage(message);
+
+            console.log('Start page toggle changed:', this.startPageEnabled);
+        } catch (error) {
+            console.error('Error saving start page toggle state:', error);
+            this.showError('Failed to save start page setting');
+            // Revert the toggle state on error
+            e.target.checked = this.startPageEnabled;
         }
     }
 
