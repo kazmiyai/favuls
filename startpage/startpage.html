@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FavURL Start Page</title>
+    <link rel="stylesheet" href="startpage.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text"
+                       id="searchInput"
+                       class="search-input"
+                       placeholder="Search bookmarks..."
+                       aria-label="Search bookmarks">
+                <button class="search-clear" id="searchClear" aria-label="Clear search">×</button>
+            </div>
+        </div>
+
+        <!-- Groups Grid Container -->
+        <div class="groups-grid" id="groupsGrid">
+            <!-- Groups will be dynamically inserted here -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-content">
+                <h2>No Bookmarks Found</h2>
+                <p>Start saving bookmarks using the FavURL extension to see them here.</p>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState">
+            <div class="loading-spinner"></div>
+            <p>Loading bookmarks...</p>
+        </div>
+    </div>
+
+    <!-- Group Card Template -->
+    <template id="groupCardTemplate">
+        <div class="group-card" data-group-id="">
+            <div class="group-header">
+                <button class="collapse-toggle" aria-label="Toggle group visibility">
+                    <span class="collapse-icon">▼</span>
+                </button>
+                <h3 class="group-title"></h3>
+                <span class="group-count"></span>
+            </div>
+            <div class="group-content">
+                <div class="bookmarks-list">
+                    <!-- Bookmarks will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Bookmark Item Template -->
+    <template id="bookmarkTemplate">
+        <div class="bookmark-item" data-url="">
+            <img class="bookmark-favicon" src="" alt="Favicon" loading="lazy">
+            <a class="bookmark-link" href="" target="_blank" rel="noopener noreferrer">
+                <span class="bookmark-title"></span>
+            </a>
+        </div>
+    </template>
+
+    <script src="startpage.js"></script>
+</body>
+</html>

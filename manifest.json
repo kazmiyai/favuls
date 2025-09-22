@@ -26,5 +26,8 @@
   },
   "background": {
     "service_worker": "background/background.js"
+  },
+  "chrome_url_overrides": {
+    "newtab": "startpage/startpage.html"
   }
 }
