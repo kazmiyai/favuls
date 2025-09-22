@@ -68,6 +68,7 @@ class StartPageApp {
         this.filteredData = { urls: [], groups: [] };
         this.searchTerm = '';
         this.collapsedGroups = new Set();
+        this.startPageEnabled = true; // Default to enabled
 
         this.elements = {
             groupsGrid: document.getElementById('groupsGrid'),
@@ -84,6 +85,15 @@ class StartPageApp {
 
     async init() {
         try {
+            // First check if start page is enabled
+            await this.checkStartPageToggle();
+
+            // If disabled, show blank page and return early
+            if (!this.startPageEnabled) {
+                this.showBlankPage();
+                return;
+            }
+
             // Load collapsed groups state from localStorage
             const collapsedData = localStorage.getItem('favurl-collapsed-groups');
             if (collapsedData) {
@@ -102,6 +112,41 @@ class StartPageApp {
             console.error('Failed to initialize start page:', error);
             this.showError('Failed to load bookmarks. Please try refreshing the page.');
         }
+    }
+
+    async checkStartPageToggle() {
+        try {
+            // Load the start page toggle state from chrome.storage.sync
+            const result = await chrome.storage.sync.get(['startPageEnabled']);
+            this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
+            console.log('Start page enabled:', this.startPageEnabled);
+        } catch (error) {
+            console.error('Error loading start page toggle state:', error);
+            // Default to enabled if we can't load the setting
+            this.startPageEnabled = true;
+        }
+    }
+
+    showBlankPage() {
+        // Hide all content and show minimal blank page
+        this.elements.loadingState.style.display = 'none';
+        this.elements.groupsGrid.style.display = 'none';
+        this.elements.emptyState.style.display = 'none';
+
+        // Hide search section
+        const searchSection = document.querySelector('.search-section');
+        if (searchSection) {
+            searchSection.style.display = 'none';
+        }
+
+        // Set document title
+        document.title = 'New Tab';
+
+        // Change background to a clean white
+        document.body.style.background = 'white';
+        document.body.style.color = '#333';
+
+        console.log('Start page disabled - showing blank page');
     }
 
     setupEventListeners() {
@@ -401,9 +446,17 @@ document.addEventListener('DOMContentLoaded', () => {
 // Listen for storage changes and update the display
 if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace === 'sync' && (changes.urls || changes.groups)) {
-            // Reload the page data when storage changes
-            window.location.reload();
+        if (namespace === 'sync') {
+            // If start page toggle changed, reload the page immediately
+            if (changes.startPageEnabled) {
+                window.location.reload();
+                return;
+            }
+
+            // If URLs or groups changed, reload the page data
+            if (changes.urls || changes.groups) {
+                window.location.reload();
+            }
         }
     });
 }
