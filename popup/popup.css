@@ -446,6 +446,7 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
+    position: relative;
 }
 
 .group-header:hover {
@@ -473,6 +474,97 @@ body {
     align-items: center;
     gap: 4px;
     margin-left: auto;
+}
+
+/* Group Drag Handle */
+.group-drag-handle {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    cursor: grab;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+}
+
+.group-drag-handle:hover {
+    opacity: 1;
+    background-color: rgba(74, 144, 226, 0.1);
+}
+
+.group-drag-handle:active {
+    cursor: grabbing;
+}
+
+.group-drag-handle::before {
+    content: "⋮⋮";
+    font-size: 12px;
+    line-height: 1;
+    color: #666;
+    letter-spacing: -2px;
+}
+
+/* Adjust group header content to make room for drag handle */
+.group-header-content {
+    margin-left: 24px;
+}
+
+/* Group Dragging States */
+.group-header.draggable {
+    cursor: grab;
+}
+
+.group-header.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+    z-index: 1000;
+    border-color: #4A90E2;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    cursor: grabbing;
+}
+
+.group-header.drag-over-top::before,
+.group-header.drag-over-bottom::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background-color: #4A90E2;
+    border-radius: 2px;
+    z-index: 1001;
+}
+
+.group-header.drag-over-top::before {
+    top: -2px;
+}
+
+.group-header.drag-over-bottom::after {
+    bottom: -2px;
+}
+
+/* Drop Zone Indicators */
+.group-drop-zone {
+    height: 6px;
+    margin: 2px 8px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    opacity: 0;
+    background-color: rgba(74, 144, 226, 0.2);
+    border: 2px dashed rgba(74, 144, 226, 0.4);
+}
+
+.group-drop-zone.active {
+    opacity: 1;
+    height: 12px;
+    background-color: rgba(74, 144, 226, 0.3);
+    border-color: #4A90E2;
 }
 
 .group-action-btn {
