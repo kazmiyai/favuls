@@ -1,0 +1,409 @@
+// Chrome Extension Start Page JavaScript
+// Loads and displays bookmarks from chrome.storage.sync
+
+// Data Model Classes (reused from popup)
+class URLDataModel {
+    constructor(data = {}) {
+        this.id = data.id || this.generateUniqueId();
+        this.url = data.url || '';
+        this.title = data.title || '';
+        this.timestamp = data.timestamp || new Date().toISOString();
+        this.groupId = data.groupId || 'ungrouped';
+        this.created = data.created || new Date().toISOString();
+        this.lastModified = data.lastModified || new Date().toISOString();
+        this.domain = data.domain || this.extractDomain(this.url);
+        this.favicon = data.favicon || this.generateFaviconUrl(this.domain);
+        this.tags = data.tags || [];
+    }
+
+    generateUniqueId() {
+        return 'url_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
+    }
+
+    extractDomain(url) {
+        try {
+            return new URL(url).hostname;
+        } catch (e) {
+            return 'unknown';
+        }
+    }
+
+    generateFaviconUrl(domain) {
+        return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+    }
+
+    static fromJSON(data) {
+        return new URLDataModel(data);
+    }
+}
+
+class GroupDataModel {
+    constructor(data = {}) {
+        this.id = data.id || this.generateUniqueId();
+        this.name = data.name || '';
+        this.created = data.created || new Date().toISOString();
+        this.lastModified = data.lastModified || new Date().toISOString();
+        this.isDefault = data.isDefault || false;
+        this.protected = data.protected || false;
+        this.color = data.color || '#2196f3';
+        this.description = data.description || '';
+        this.urlCount = data.urlCount || 0;
+        this.order = data.order || 0;
+    }
+
+    generateUniqueId() {
+        return 'group_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
+    }
+
+    static fromJSON(data) {
+        return new GroupDataModel(data);
+    }
+}
+
+// Start Page Application Class
+class StartPageApp {
+    constructor() {
+        this.urls = [];
+        this.groups = [];
+        this.filteredData = { urls: [], groups: [] };
+        this.searchTerm = '';
+        this.collapsedGroups = new Set();
+
+        this.elements = {
+            groupsGrid: document.getElementById('groupsGrid'),
+            emptyState: document.getElementById('emptyState'),
+            loadingState: document.getElementById('loadingState'),
+            searchInput: document.getElementById('searchInput'),
+            searchClear: document.getElementById('searchClear'),
+            groupCardTemplate: document.getElementById('groupCardTemplate'),
+            bookmarkTemplate: document.getElementById('bookmarkTemplate')
+        };
+
+        this.init();
+    }
+
+    async init() {
+        try {
+            // Load collapsed groups state from localStorage
+            const collapsedData = localStorage.getItem('favurl-collapsed-groups');
+            if (collapsedData) {
+                this.collapsedGroups = new Set(JSON.parse(collapsedData));
+            }
+
+            // Set up event listeners
+            this.setupEventListeners();
+
+            // Load data from chrome.storage.sync
+            await this.loadData();
+
+            // Render the page
+            this.render();
+        } catch (error) {
+            console.error('Failed to initialize start page:', error);
+            this.showError('Failed to load bookmarks. Please try refreshing the page.');
+        }
+    }
+
+    setupEventListeners() {
+        // Search functionality
+        this.elements.searchInput.addEventListener('input', (e) => {
+            this.handleSearch(e.target.value);
+        });
+
+        this.elements.searchClear.addEventListener('click', () => {
+            this.elements.searchInput.value = '';
+            this.handleSearch('');
+        });
+
+        // Show/hide clear button based on input
+        this.elements.searchInput.addEventListener('input', (e) => {
+            if (e.target.value.trim()) {
+                this.elements.searchClear.classList.add('visible');
+            } else {
+                this.elements.searchClear.classList.remove('visible');
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.elements.searchInput.value = '';
+                this.handleSearch('');
+                this.elements.searchInput.blur();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                this.elements.searchInput.focus();
+            }
+        });
+    }
+
+    async loadData() {
+        try {
+            // Load data from Chrome storage
+            const result = await chrome.storage.sync.get(['urls', 'groups']);
+
+            // Process URLs
+            this.urls = (result.urls || []).map(urlData => URLDataModel.fromJSON(urlData));
+
+            // Process groups and ensure default "Ungrouped" exists
+            let groups = result.groups || [];
+            const ungroupedExists = groups.some(group => group.id === 'ungrouped');
+
+            if (!ungroupedExists) {
+                groups.unshift({
+                    id: 'ungrouped',
+                    name: 'Ungrouped',
+                    created: new Date().toISOString(),
+                    lastModified: new Date().toISOString(),
+                    isDefault: true,
+                    protected: true,
+                    color: '#666666',
+                    description: 'Default group for uncategorized bookmarks',
+                    urlCount: 0,
+                    order: 0
+                });
+            }
+
+            this.groups = groups.map(groupData => GroupDataModel.fromJSON(groupData));
+
+            // Update group URL counts
+            this.updateGroupCounts();
+
+            // Sort groups by order, then by name
+            this.groups.sort((a, b) => {
+                if (a.order !== b.order) {
+                    return a.order - b.order;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            // Filter data initially (no search term)
+            this.filterData('');
+
+        } catch (error) {
+            console.error('Error loading data:', error);
+            throw error;
+        }
+    }
+
+    updateGroupCounts() {
+        // Reset counts
+        this.groups.forEach(group => {
+            group.urlCount = 0;
+        });
+
+        // Count URLs in each group
+        this.urls.forEach(url => {
+            const group = this.groups.find(g => g.id === url.groupId);
+            if (group) {
+                group.urlCount++;
+            }
+        });
+    }
+
+    handleSearch(searchTerm) {
+        this.searchTerm = searchTerm.toLowerCase().trim();
+        this.filterData(this.searchTerm);
+        this.render();
+    }
+
+    filterData(searchTerm) {
+        if (!searchTerm) {
+            // No search term - show all data
+            this.filteredData.groups = this.groups.filter(group => group.urlCount > 0);
+            this.filteredData.urls = this.urls;
+            return;
+        }
+
+        // Filter URLs by search term
+        const filteredUrls = this.urls.filter(url =>
+            url.title.toLowerCase().includes(searchTerm) ||
+            url.url.toLowerCase().includes(searchTerm) ||
+            url.domain.toLowerCase().includes(searchTerm)
+        );
+
+        // Filter groups that have matching URLs or matching group names
+        const groupsWithMatchingUrls = new Set(filteredUrls.map(url => url.groupId));
+        const filteredGroups = this.groups.filter(group =>
+            groupsWithMatchingUrls.has(group.id) ||
+            group.name.toLowerCase().includes(searchTerm)
+        );
+
+        this.filteredData.groups = filteredGroups;
+        this.filteredData.urls = filteredUrls;
+    }
+
+    render() {
+        // Hide loading state
+        this.elements.loadingState.style.display = 'none';
+
+        // Check if we have any data to show
+        if (this.filteredData.groups.length === 0) {
+            this.showEmptyState();
+            return;
+        }
+
+        // Hide empty state and show content
+        this.elements.emptyState.style.display = 'none';
+        this.elements.groupsGrid.style.display = 'grid';
+
+        // Clear existing content
+        this.elements.groupsGrid.innerHTML = '';
+
+        // Render each group
+        this.filteredData.groups.forEach(group => {
+            const groupUrls = this.filteredData.urls.filter(url => url.groupId === group.id);
+            if (groupUrls.length > 0) {
+                this.renderGroup(group, groupUrls);
+            }
+        });
+    }
+
+    renderGroup(group, urls) {
+        const template = this.elements.groupCardTemplate.content.cloneNode(true);
+        const groupCard = template.querySelector('.group-card');
+        const groupTitle = template.querySelector('.group-title');
+        const groupCount = template.querySelector('.group-count');
+        const bookmarksList = template.querySelector('.bookmarks-list');
+        const collapseToggle = template.querySelector('.collapse-toggle');
+
+        // Set group data
+        groupCard.setAttribute('data-group-id', group.id);
+        groupTitle.textContent = group.name;
+        groupCount.textContent = urls.length;
+
+        // Check if group is collapsed
+        const isCollapsed = this.collapsedGroups.has(group.id);
+        if (isCollapsed) {
+            groupCard.classList.add('collapsed');
+        }
+
+        // Set up collapse toggle
+        collapseToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleGroupCollapse(group.id);
+        });
+
+        // Make entire header clickable for collapse/expand
+        const groupHeader = template.querySelector('.group-header');
+        groupHeader.addEventListener('click', () => {
+            this.toggleGroupCollapse(group.id);
+        });
+
+        // Render bookmarks
+        urls.forEach(url => {
+            this.renderBookmark(url, bookmarksList);
+        });
+
+        this.elements.groupsGrid.appendChild(template);
+    }
+
+    renderBookmark(url, container) {
+        const template = this.elements.bookmarkTemplate.content.cloneNode(true);
+        const bookmarkItem = template.querySelector('.bookmark-item');
+        const bookmarkFavicon = template.querySelector('.bookmark-favicon');
+        const bookmarkLink = template.querySelector('.bookmark-link');
+        const bookmarkTitle = template.querySelector('.bookmark-title');
+
+        // Set bookmark data
+        bookmarkItem.setAttribute('data-url', url.url);
+        bookmarkLink.setAttribute('href', url.url);
+        bookmarkTitle.textContent = url.title;
+
+        // Set favicon
+        bookmarkFavicon.src = url.favicon;
+        bookmarkFavicon.alt = `${url.title} favicon`;
+
+        // Handle favicon load errors
+        bookmarkFavicon.addEventListener('error', () => {
+            bookmarkFavicon.classList.add('error');
+            bookmarkFavicon.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjVGNUY1IiByeD0iMiIvPgo8cGF0aCBkPSJNNCA2SDE0VjEwSDRWNloiIGZpbGw9IiNEREREREQiLz4KPHBhdGggZD0iTTYgOEgxMlY5SDZWOFoiIGZpbGw9IiNCQkJCQkIiLz4KPC9zdmc+';
+        });
+
+        // Highlight search terms
+        if (this.searchTerm) {
+            this.highlightSearchTerm(bookmarkTitle, url.title, this.searchTerm);
+        }
+
+        container.appendChild(template);
+    }
+
+    highlightSearchTerm(element, text, searchTerm) {
+        const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        const highlightedText = text.replace(regex, '<span class="search-highlight">$1</span>');
+        element.innerHTML = highlightedText;
+    }
+
+    toggleGroupCollapse(groupId) {
+        const groupCard = document.querySelector(`[data-group-id="${groupId}"]`);
+        if (!groupCard) return;
+
+        if (this.collapsedGroups.has(groupId)) {
+            this.collapsedGroups.delete(groupId);
+            groupCard.classList.remove('collapsed');
+        } else {
+            this.collapsedGroups.add(groupId);
+            groupCard.classList.add('collapsed');
+        }
+
+        // Save collapsed state to localStorage
+        localStorage.setItem('favurl-collapsed-groups', JSON.stringify([...this.collapsedGroups]));
+    }
+
+    showEmptyState() {
+        this.elements.groupsGrid.style.display = 'none';
+        this.elements.emptyState.style.display = 'block';
+
+        const emptyContent = this.elements.emptyState.querySelector('.empty-content');
+        if (this.searchTerm) {
+            emptyContent.innerHTML = `
+                <h2>No Results Found</h2>
+                <p>No bookmarks found matching "${this.searchTerm}". Try a different search term.</p>
+            `;
+        } else if (this.urls.length === 0) {
+            emptyContent.innerHTML = `
+                <h2>No Bookmarks Found</h2>
+                <p>Start saving bookmarks using the FavURL extension to see them here.</p>
+            `;
+        }
+    }
+
+    showError(message) {
+        this.elements.loadingState.style.display = 'none';
+        this.elements.groupsGrid.style.display = 'none';
+        this.elements.emptyState.style.display = 'block';
+
+        const emptyContent = this.elements.emptyState.querySelector('.empty-content');
+        emptyContent.innerHTML = `
+            <h2>Error</h2>
+            <p>${message}</p>
+        `;
+    }
+}
+
+// Initialize the start page when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're in a Chrome extension context
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+        new StartPageApp();
+    } else {
+        console.error('Chrome extension APIs not available');
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'block';
+        document.querySelector('.empty-content').innerHTML = `
+            <h2>Extension Context Required</h2>
+            <p>This start page must be loaded as a Chrome extension to access your bookmarks.</p>
+        `;
+    }
+});
+
+// Listen for storage changes and update the display
+if (typeof chrome !== 'undefined' && chrome.storage) {
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'sync' && (changes.urls || changes.groups)) {
+            // Reload the page data when storage changes
+            window.location.reload();
+        }
+    });
+}
