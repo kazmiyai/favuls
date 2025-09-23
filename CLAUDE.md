@@ -48,18 +48,29 @@ A Chrome extension for bookmark management with local db sync(chrome.storage.syn
 ### 2.2 Local Database
 - **Storage API**: Chrome Extension Storage API
 - **Storage Type**: `chrome.storage.sync`.
-- **Data Structure**:
+- **Enhanced 32-Key Storage Structure**:
   ```json
   {
-    "urls": [
+    "urls0": [
       {
         "id": "unique_id",
         "url": "https://example.com",
         "title": "Page Title",
         "timestamp": "ISO_timestamp",
-        "groupId": "group_id"
+        "groupId": "ungrouped"
       }
     ],
+    "urls1": [
+      {
+        "id": "unique_id2",
+        "url": "https://work.example.com",
+        "title": "Work Page",
+        "timestamp": "ISO_timestamp",
+        "groupId": "group_id_1"
+      }
+    ],
+    "urls2": "... additional URL groups ...",
+    "...": "urls3 through urls31",
     "groups": [
       {
         "id": "group_id",
@@ -69,10 +80,17 @@ A Chrome extension for bookmark management with local db sync(chrome.storage.syn
     ]
   }
   ```
+- **Storage Organization**:
+  - URLs distributed across 32 separate keys: `urls0` through `urls31`
+  - `urls0` always contains "Ungrouped" URLs
+  - `urls1` through `urls31` contain URLs for specific groups
+  - Groups stored in single `groups` key for metadata
 - **Storage Limits**:
   - chrome.storage.sync total limit: 100KB
-  - Per-item limit: 8KB
-- **Default Group**: "Ungrouped" group (id: "ungrouped") automatically created if not exists
+  - Per-item limit: 8KB (each `urlsX` key respects this limit)
+  - Better distribution allows for larger total collections
+- **Default Group**: "Ungrouped" group (id: "ungrouped") automatically created, always uses `urls0`
+- **Migration**: Automatic migration from legacy single `urls` key to new 32-key structure
 
 ## 3. Non-Functional Requirements
 

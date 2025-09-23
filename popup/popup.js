@@ -75,23 +75,49 @@ class BookmarkManager {
     // Data Management (Task 3.3: Enhanced with data models)
     async loadData() {
         try {
-            const result = await chrome.storage.sync.get(['urls', 'groups', 'dataModelVersion', 'startPageEnabled']);
-
-            // Convert loaded data to data model instances
-            this.urls = (result.urls || []).map(urlData => URLDataModel.fromJSON(urlData));
-            this.groups = (result.groups || []).map(groupData => GroupDataModel.fromJSON(groupData));
+            // First check for legacy single 'urls' key and groups
+            const legacyResult = await chrome.storage.sync.get(['urls', 'groups', 'dataModelVersion', 'startPageEnabled']);
 
             // Load start page toggle state (default to true for existing users)
-            this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
+            this.startPageEnabled = legacyResult.startPageEnabled !== undefined ? legacyResult.startPageEnabled : true;
 
-            // Check for data model version compatibility
-            if (result.dataModelVersion && result.dataModelVersion !== this.dataModelVersion) {
-                console.log(`Data model migration needed: ${result.dataModelVersion} -> ${this.dataModelVersion}`);
-                await this.migrateDataModel(result.dataModelVersion);
+            // Check if we have legacy data that needs migration
+            if (legacyResult.urls && Array.isArray(legacyResult.urls) && legacyResult.urls.length > 0) {
+                console.log('Legacy single-key URL storage detected, migrating to 32-key structure...');
+
+                // Load legacy data
+                this.urls = (legacyResult.urls || []).map(urlData => URLDataModel.fromJSON(urlData));
+                this.groups = (legacyResult.groups || []).map(groupData => GroupDataModel.fromJSON(groupData));
+
+                // Ensure default group exists before migration
+                this.initializeDefaultGroup();
+
+                // Migrate to new storage structure
+                await this.migrateLegacyStorageToNewStructure();
+
+                console.log('Legacy data migration completed');
+            } else {
+                // Load from new 32-key structure
+                console.log('Loading from new 32-key storage structure...');
+
+                // Load groups first
+                this.groups = (legacyResult.groups || []).map(groupData => GroupDataModel.fromJSON(groupData));
+
+                // Ensure default group exists
+                this.initializeDefaultGroup();
+
+                // Load URLs from all storage keys using new utility function
+                const allUrlsData = await FavURLUtils.loadAllURLsFromStorage();
+                this.urls = allUrlsData.map(urlData => URLDataModel.fromJSON(urlData));
+
+                console.log(`Loaded ${this.urls.length} URLs from 32-key storage structure`);
             }
 
-            // Ensure default "Ungrouped" group exists
-            this.initializeDefaultGroup();
+            // Check for data model version compatibility
+            if (legacyResult.dataModelVersion && legacyResult.dataModelVersion !== this.dataModelVersion) {
+                console.log(`Data model migration needed: ${legacyResult.dataModelVersion} -> ${this.dataModelVersion}`);
+                await this.migrateDataModel(legacyResult.dataModelVersion);
+            }
 
             // Validate data integrity and fix issues
             await this.validateAndFixDataIntegrity();
@@ -128,22 +154,27 @@ class BookmarkManager {
                 throw new Error(`Storage quota exceeded. Data size: ${Math.round(dataSize/1024)}KB, Limit: ${Math.round(this.storageQuotaLimit/1024)}KB`);
             }
 
-            // Save data with storage quota management (Task 3.3: Serialize data models)
-            const serializedData = {
-                urls: this.urls.map(url => url.toJSON()),
-                groups: this.groups.map(group => group.toJSON()),
+            // Save URLs using new 32-key storage structure
+            const urlsData = this.urls.map(url => url.toJSON());
+            const groupsData = this.groups.map(group => group.toJSON());
+
+            await FavURLUtils.saveURLsToStorage(urlsData, groupsData);
+
+            // Save metadata separately (non-URL data)
+            const metadataData = {
+                groups: groupsData,
                 lastUpdated: new Date().toISOString(),
                 version: '1.0',
                 dataModelVersion: this.dataModelVersion,
                 startPageEnabled: this.startPageEnabled
             };
 
-            await chrome.storage.sync.set(serializedData);
+            await chrome.storage.sync.set(metadataData);
 
             // Update storage quota tracking
             await this.updateStorageQuota();
 
-            console.log('Data saved successfully to chrome.storage.sync');
+            console.log('Data saved successfully to chrome.storage.sync with 32-key structure');
         } catch (error) {
             console.error('Error saving data:', error);
             if (error.message.includes('quota')) {
@@ -588,6 +619,30 @@ class BookmarkManager {
         // For now, just update the version
 
         return true;
+    }
+
+    // Migration function for legacy single-key storage to new 32-key structure
+    async migrateLegacyStorageToNewStructure() {
+        try {
+            console.log('Starting migration from legacy single-key storage to 32-key structure...');
+
+            // Use the new utility function to save URLs to the 32-key structure
+            const urlsData = this.urls.map(url => url.toJSON());
+            const groupsData = this.groups.map(group => group.toJSON());
+
+            await FavURLUtils.saveURLsToStorage(urlsData, groupsData);
+
+            // After successfully saving to new structure, remove legacy 'urls' key
+            await chrome.storage.sync.remove(['urls']);
+
+            console.log('Legacy storage migration completed successfully');
+            console.log(`Migrated ${this.urls.length} URLs to new 32-key storage structure`);
+
+            return true;
+        } catch (error) {
+            console.error('Error during legacy storage migration:', error);
+            throw error;
+        }
     }
 
     // URL List Rendering (Task 4.2: Enhanced group display)
@@ -2011,6 +2066,7 @@ class BookmarkManager {
 
             if (currentGroupIndex > 0) {
                 const targetGroup = sortedGroups[currentGroupIndex - 1];
+                const fromGroupId = url.groupId;
 
                 // Get the maximum order in the target group
                 const targetGroupURLs = this.urls.filter(u => u.groupId === targetGroup.id);
@@ -2021,8 +2077,15 @@ class BookmarkManager {
                 url.order = maxOrder + 1;
                 url.lastModified = new Date().toISOString();
 
-                // Save and update UI
-                await this.saveData();
+                // Use optimized storage movement (only if different storage keys)
+                try {
+                    await FavURLUtils.moveURLBetweenStorageKeys(urlId, fromGroupId, targetGroup.id, this.groups.map(g => g.toJSON()));
+                } catch (storageError) {
+                    console.warn('Optimized storage move failed, falling back to full save:', storageError);
+                    // Fall back to full save if optimized move fails
+                    await this.saveData();
+                }
+
                 this.renderURLs();
 
                 // Re-focus the moved URL
@@ -2051,6 +2114,7 @@ class BookmarkManager {
 
             if (currentGroupIndex < sortedGroups.length - 1) {
                 const targetGroup = sortedGroups[currentGroupIndex + 1];
+                const fromGroupId = url.groupId;
 
                 // Get the maximum order in the target group
                 const targetGroupURLs = this.urls.filter(u => u.groupId === targetGroup.id);
@@ -2061,8 +2125,15 @@ class BookmarkManager {
                 url.order = maxOrder + 1;
                 url.lastModified = new Date().toISOString();
 
-                // Save and update UI
-                await this.saveData();
+                // Use optimized storage movement (only if different storage keys)
+                try {
+                    await FavURLUtils.moveURLBetweenStorageKeys(urlId, fromGroupId, targetGroup.id, this.groups.map(g => g.toJSON()));
+                } catch (storageError) {
+                    console.warn('Optimized storage move failed, falling back to full save:', storageError);
+                    // Fall back to full save if optimized move fails
+                    await this.saveData();
+                }
+
                 this.renderURLs();
 
                 // Re-focus the moved URL
@@ -2798,8 +2869,21 @@ class BookmarkManager {
     // Export functionality
     async exportData() {
         try {
-            // Load current data from storage
-            const result = await chrome.storage.sync.get(['urls', 'groups']);
+            // Load current data from storage - check both legacy and new structure
+            const legacyResult = await chrome.storage.sync.get(['urls', 'groups']);
+
+            let allUrls = [];
+
+            // Check if we have legacy single-key storage
+            if (legacyResult.urls && Array.isArray(legacyResult.urls) && legacyResult.urls.length > 0) {
+                console.log('Exporting from legacy single-key URL storage...');
+                allUrls = legacyResult.urls;
+            } else {
+                // Load from new 32-key structure
+                console.log('Exporting from new 32-key storage structure...');
+                allUrls = await FavURLUtils.loadAllURLsFromStorage();
+                console.log(`Collected ${allUrls.length} URLs from 32-key storage for export`);
+            }
 
             // Create export data with metadata
             const exportData = {
@@ -2807,11 +2891,12 @@ class BookmarkManager {
                     version: "1.0",
                     exportDate: new Date().toISOString(),
                     source: "FavURL Extension",
-                    totalGroups: (result.groups || []).length,
-                    totalUrls: (result.urls || []).length
+                    storageFormat: allUrls.length > 0 && !legacyResult.urls ? "32-key" : "legacy",
+                    totalGroups: (legacyResult.groups || []).length,
+                    totalUrls: allUrls.length
                 },
-                groups: result.groups || [],
-                urls: result.urls || []
+                groups: legacyResult.groups || [],
+                urls: allUrls
             };
 
             // Convert to JSON
@@ -3055,10 +3140,14 @@ class BookmarkManager {
 
     async processImport(importData) {
         try {
-            // Load existing data
-            const existing = await chrome.storage.sync.get(['urls', 'groups']);
-            const existingUrls = existing.urls || [];
-            const existingGroups = existing.groups || [];
+            // Load existing data from new storage structure
+            const existingGroupsResult = await chrome.storage.sync.get(['groups']);
+            const existingGroups = existingGroupsResult.groups || [];
+
+            // Load existing URLs from 32-key structure
+            const existingUrls = await FavURLUtils.loadAllURLsFromStorage();
+
+            console.log(`Merge import: Loading ${existingUrls.length} existing URLs from storage`);
 
             // Merge groups
             const mergedGroups = this.mergeGroups(existingGroups, importData.groups);
@@ -3066,11 +3155,20 @@ class BookmarkManager {
             // Merge URLs
             const mergedUrls = this.mergeUrls(existingUrls, importData.urls);
 
-            // Save merged data
+            console.log(`Merge import: After merge - ${mergedUrls.length} total URLs`);
+
+            // Save merged groups
             await chrome.storage.sync.set({
                 groups: mergedGroups,
-                urls: mergedUrls
+                version: '1.0',
+                lastUpdated: new Date().toISOString(),
+                dataModelVersion: this.dataModelVersion
             });
+
+            // Save merged URLs using new 32-key structure
+            await FavURLUtils.saveURLsToStorage(mergedUrls, mergedGroups);
+
+            console.log(`Merge import: Saved ${mergedUrls.length} URLs to 32-key storage structure`);
 
             // Reload data and UI
             await this.loadData();
@@ -3094,11 +3192,21 @@ class BookmarkManager {
                 return;
             }
 
-            // Directly replace all data with import data
+            // Clear all existing storage first
+            await chrome.storage.sync.clear();
+
+            // Save groups
             await chrome.storage.sync.set({
                 groups: importData.groups,
-                urls: importData.urls
+                version: '1.0',
+                lastUpdated: new Date().toISOString(),
+                dataModelVersion: this.dataModelVersion
             });
+
+            // Save URLs using new 32-key structure
+            await FavURLUtils.saveURLsToStorage(importData.urls, importData.groups);
+
+            console.log(`Import: Saved ${importData.urls.length} URLs to 32-key storage structure`);
 
             // Reload data and UI
             await this.loadData();
