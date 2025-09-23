@@ -14,12 +14,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 // Initialize extension with default data (Task 3.1: Enhanced storage initialization)
 async function initializeExtension() {
     try {
-        // Get existing data
-        const result = await chrome.storage.sync.get(['groups', 'urls', 'version', 'lastUpdated']);
+        // Get existing data - check both legacy and new structure
+        const legacyResult = await chrome.storage.sync.get(['groups', 'urls', 'version', 'lastUpdated']);
 
-        // Initialize empty arrays if data doesn't exist
-        const groups = result.groups || [];
-        const urls = result.urls || [];
+        // Check if we have legacy URL storage
+        const hasLegacyUrls = legacyResult.urls && Array.isArray(legacyResult.urls) && legacyResult.urls.length > 0;
+
+        // Initialize groups
+        const groups = legacyResult.groups || [];
 
         // Create default "Ungrouped" group if it doesn't exist (Task 3.2: Enhanced default group)
         let defaultGroup = groups.find(g => g.id === 'ungrouped');
@@ -53,8 +55,31 @@ async function initializeExtension() {
             }
         }
 
-        // Validate and fix URL group assignments
+        let urls = [];
         let fixedUrlCount = 0;
+
+        if (hasLegacyUrls) {
+            console.log('Legacy URLs detected in background, will be migrated on first popup load');
+            urls = legacyResult.urls;
+        } else {
+            // Load URLs from new 32-key structure
+            console.log('Loading URLs from 32-key storage structure in background...');
+            const urlKeys = [];
+            for (let i = 0; i <= 31; i++) {
+                urlKeys.push(`urls${i}`);
+            }
+            const urlsResult = await chrome.storage.sync.get(urlKeys);
+
+            // Combine URLs from all keys
+            for (const key of urlKeys) {
+                if (urlsResult[key] && Array.isArray(urlsResult[key])) {
+                    urls.push(...urlsResult[key]);
+                }
+            }
+            console.log(`Loaded ${urls.length} URLs from 32-key storage structure in background`);
+        }
+
+        // Validate and fix URL group assignments
         urls.forEach(url => {
             if (!url.groupId || !groups.find(g => g.id === url.groupId)) {
                 url.groupId = 'ungrouped';
@@ -66,13 +91,35 @@ async function initializeExtension() {
             console.log(`Fixed ${fixedUrlCount} URLs with invalid group assignments in background`);
         }
 
-        // Set initial data with version tracking
-        await chrome.storage.sync.set({
-            groups: groups,
-            urls: urls,
-            version: '1.0',
-            lastUpdated: new Date().toISOString()
-        });
+        // Save data using appropriate structure
+        if (hasLegacyUrls || urls.length === 0) {
+            // For new installs or legacy data, save metadata only
+            // URLs will be migrated/saved by popup.js when first opened
+            await chrome.storage.sync.set({
+                groups: groups,
+                version: '1.0',
+                lastUpdated: new Date().toISOString()
+            });
+
+            if (hasLegacyUrls) {
+                console.log('Legacy URL storage detected, migration will occur on first popup open');
+            }
+        } else {
+            // Initialize 32-key storage structure with empty arrays
+            const storageData = {
+                groups: groups,
+                version: '1.0',
+                lastUpdated: new Date().toISOString()
+            };
+
+            // Initialize all URL storage keys as empty arrays
+            for (let i = 0; i <= 31; i++) {
+                storageData[`urls${i}`] = [];
+            }
+
+            await chrome.storage.sync.set(storageData);
+            console.log('32-key storage structure initialized in background');
+        }
 
         // Log storage usage
         const usage = await chrome.storage.sync.getBytesInUse();
@@ -84,7 +131,32 @@ async function initializeExtension() {
         // Fallback: try to clear storage and reinitialize
         try {
             await chrome.storage.sync.clear();
-            await initializeExtension();
+            console.log('Storage cleared, reinitializing with minimal data...');
+
+            // Create minimal initialization
+            await chrome.storage.sync.set({
+                groups: [{
+                    id: 'ungrouped',
+                    name: 'Ungrouped',
+                    created: new Date().toISOString(),
+                    isDefault: true,
+                    protected: true
+                }],
+                version: '1.0',
+                lastUpdated: new Date().toISOString()
+            });
+
+            // Initialize empty URL storage keys
+            const emptyUrlStorage = {};
+            for (let i = 0; i <= 31; i++) {
+                emptyUrlStorage[`urls${i}`] = [];
+            }
+            await chrome.storage.sync.set(emptyUrlStorage);
+
+            console.log('Fallback initialization completed');
+
+            const usage = await chrome.storage.sync.getBytesInUse();
+            console.log(`Fallback storage usage: ${usage} bytes (${Math.round(usage/1024 * 100)/100}KB)`);
         } catch (fallbackError) {
             console.error('Fallback initialization failed:', fallbackError);
         }
