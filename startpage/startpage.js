@@ -1,65 +1,6 @@
 // Chrome Extension Start Page JavaScript
 // Loads and displays bookmarks from chrome.storage.sync
 
-// Data Model Classes (reused from popup)
-class URLDataModel {
-    constructor(data = {}) {
-        this.id = data.id || this.generateUniqueId();
-        this.url = data.url || '';
-        this.title = data.title || '';
-        this.timestamp = data.timestamp || new Date().toISOString();
-        this.groupId = data.groupId || 'ungrouped';
-        this.created = data.created || new Date().toISOString();
-        this.lastModified = data.lastModified || new Date().toISOString();
-        this.domain = data.domain || this.extractDomain(this.url);
-        this.favicon = data.favicon || this.generateFaviconUrl(this.domain);
-        this.tags = data.tags || [];
-    }
-
-    generateUniqueId() {
-        return 'url_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
-    }
-
-    extractDomain(url) {
-        try {
-            return new URL(url).hostname;
-        } catch (e) {
-            return 'unknown';
-        }
-    }
-
-    generateFaviconUrl(domain) {
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
-    }
-
-    static fromJSON(data) {
-        return new URLDataModel(data);
-    }
-}
-
-class GroupDataModel {
-    constructor(data = {}) {
-        this.id = data.id || this.generateUniqueId();
-        this.name = data.name || '';
-        this.created = data.created || new Date().toISOString();
-        this.lastModified = data.lastModified || new Date().toISOString();
-        this.isDefault = data.isDefault || false;
-        this.protected = data.protected || false;
-        this.color = data.color || '#2196f3';
-        this.description = data.description || '';
-        this.urlCount = data.urlCount || 0;
-        this.order = data.order || 0;
-    }
-
-    generateUniqueId() {
-        return 'group_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
-    }
-
-    static fromJSON(data) {
-        return new GroupDataModel(data);
-    }
-}
-
 // Start Page Application Class
 class StartPageApp {
     constructor() {
