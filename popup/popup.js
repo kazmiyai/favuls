@@ -3,164 +3,6 @@
 // Task 2.4: In-Memory URL Display
 // Task 3.3: Complete Data Model Implementation
 
-// Data Model Classes (Task 3.3)
-class URLDataModel {
-    constructor(data = {}) {
-        this.id = data.id || this.generateUniqueId();
-        this.url = data.url || '';
-        this.title = data.title || '';
-        this.timestamp = data.timestamp || new Date().toISOString();
-        this.groupId = data.groupId || 'ungrouped';
-        this.created = data.created || new Date().toISOString();
-        this.lastModified = data.lastModified || new Date().toISOString();
-        this.domain = data.domain || this.extractDomain(this.url);
-        this.favicon = data.favicon || this.generateFaviconUrl(this.domain);
-        this.tags = data.tags || [];
-        this.order = data.order !== undefined ? data.order : Date.now(); // Use timestamp as default order
-        this.isValidated = false;
-    }
-
-    generateUniqueId() {
-        return 'url_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
-    }
-
-    extractDomain(url) {
-        try {
-            return new URL(url).hostname;
-        } catch (e) {
-            return 'unknown';
-        }
-    }
-
-    generateFaviconUrl(domain) {
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
-    }
-
-    validate() {
-        const errors = [];
-
-        if (!this.url || typeof this.url !== 'string') {
-            errors.push('URL is required and must be a string');
-        } else {
-            try {
-                const urlObj = new URL(this.url);
-                if (!['http:', 'https:'].includes(urlObj.protocol)) {
-                    errors.push('URL must use HTTP or HTTPS protocol');
-                }
-            } catch (e) {
-                errors.push('URL format is invalid');
-            }
-        }
-
-        if (!this.title || typeof this.title !== 'string') {
-            errors.push('Title is required and must be a string');
-        }
-
-        if (!this.id || typeof this.id !== 'string') {
-            errors.push('ID is required and must be a string');
-        }
-
-        if (!this.groupId || typeof this.groupId !== 'string') {
-            errors.push('Group ID is required and must be a string');
-        }
-
-        this.isValidated = errors.length === 0;
-        return { isValid: this.isValidated, errors };
-    }
-
-    toJSON() {
-        return {
-            id: this.id,
-            url: this.url,
-            title: this.title,
-            timestamp: this.timestamp,
-            groupId: this.groupId,
-            created: this.created,
-            lastModified: this.lastModified,
-            domain: this.domain,
-            favicon: this.favicon,
-            tags: this.tags,
-            order: this.order
-        };
-    }
-
-    static fromJSON(data) {
-        return new URLDataModel(data);
-    }
-}
-
-class GroupDataModel {
-    constructor(data = {}) {
-        this.id = data.id || this.generateUniqueId();
-        this.name = data.name || '';
-        this.created = data.created || new Date().toISOString();
-        this.lastModified = data.lastModified || new Date().toISOString();
-        this.isDefault = data.isDefault || false;
-        this.protected = data.protected || false;
-        this.color = data.color || '#2196f3';
-        this.description = data.description || '';
-        this.urlCount = data.urlCount || 0;
-        this.order = data.order !== undefined ? data.order : 0;
-        this.isValidated = false;
-    }
-
-    generateUniqueId() {
-        return 'group_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
-    }
-
-    validate() {
-        const errors = [];
-
-        if (!this.name || typeof this.name !== 'string') {
-            errors.push('Group name is required and must be a string');
-        } else if (this.name.length > 50) {
-            errors.push('Group name must be 50 characters or less');
-        }
-
-        if (!this.id || typeof this.id !== 'string') {
-            errors.push('Group ID is required and must be a string');
-        }
-
-        if (this.color && !/^#[0-9A-F]{6}$/i.test(this.color)) {
-            errors.push('Color must be a valid hex color code');
-        }
-
-        this.isValidated = errors.length === 0;
-        return { isValid: this.isValidated, errors };
-    }
-
-    toJSON() {
-        return {
-            id: this.id,
-            name: this.name,
-            created: this.created,
-            lastModified: this.lastModified,
-            isDefault: this.isDefault,
-            protected: this.protected,
-            color: this.color,
-            description: this.description,
-            urlCount: this.urlCount,
-            order: this.order
-        };
-    }
-
-    static fromJSON(data) {
-        return new GroupDataModel(data);
-    }
-
-    static createDefault() {
-        return new GroupDataModel({
-            id: 'ungrouped',
-            name: 'Ungrouped',
-            isDefault: true,
-            protected: true,
-            color: '#9e9e9e',
-            description: 'Default group for uncategorized bookmarks',
-            order: 0
-        });
-    }
-}
-
 class BookmarkManager {
     constructor() {
         // Task 3.3: Complete data model implementation
@@ -547,17 +389,12 @@ class BookmarkManager {
 
     // URL Validation
     isValidURL(string) {
-        try {
-            const url = new URL(string);
-            return url.protocol === 'http:' || url.protocol === 'https:';
-        } catch (_) {
-            return false;
-        }
+        return FavURLUtils.isValidURL(string);
     }
 
     // Generate unique ID
     generateUniqueId() {
-        return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        return FavURLUtils.generateUniqueId('url_');
     }
 
     // Get default group ID (Task 3.2: Default assignment for new URLs)
@@ -1826,8 +1663,8 @@ class BookmarkManager {
             existingURL.lastModified = new Date().toISOString();
 
             // Update domain and favicon if URL changed
-            existingURL.domain = existingURL.extractDomain(url);
-            existingURL.favicon = existingURL.generateFaviconUrl(existingURL.domain);
+            existingURL.domain = FavURLUtils.extractDomain(url);
+            existingURL.favicon = FavURLUtils.generateFaviconUrl(existingURL.domain);
 
             // Validate the updated URL
             const validation = existingURL.validate();
@@ -1975,7 +1812,7 @@ class BookmarkManager {
         }
     }
 
-    handleURLReorderDragEnter(e, targetURLData) {
+    handleURLReorderDragEnter(e) {
         e.preventDefault();
         // Visual feedback is handled in dragover
     }
@@ -2466,7 +2303,7 @@ class BookmarkManager {
         }
     }
 
-    handleGroupReorderDragEnter(e, targetGroupId) {
+    handleGroupReorderDragEnter(e) {
         e.preventDefault();
         // Visual feedback is handled in dragover
     }
@@ -2840,17 +2677,11 @@ class BookmarkManager {
 
     // Utility Methods
     extractDomain(url) {
-        try {
-            return new URL(url).hostname;
-        } catch (e) {
-            return 'unknown';
-        }
+        return FavURLUtils.extractDomain(url);
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return FavURLUtils.escapeHtml(text);
     }
 
     // UI Feedback Methods
