@@ -239,7 +239,8 @@ class StartPageApp {
 
         // Render each group
         this.filteredData.groups.forEach(group => {
-            const groupUrls = this.filteredData.urls.filter(url => url.groupId === group.id);
+            const groupUrls = this.filteredData.urls.filter(url => url.groupId === group.id)
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
             if (groupUrls.length > 0) {
                 this.renderGroup(group, groupUrls);
             }
