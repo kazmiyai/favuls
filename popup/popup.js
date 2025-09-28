@@ -18,6 +18,7 @@ class BookmarkManager {
         this.groupExpandedState = {}; // Track which groups are expanded/collapsed
         // Start page toggle state
         this.startPageEnabled = true; // Default to enabled
+        this.openInNewTab = true; // Default to opening in new tab
         this.init();
     }
 
@@ -76,7 +77,7 @@ class BookmarkManager {
     async loadData() {
         try {
             // Prepare keys for chunked storage
-            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'urls', 'groups'];
+            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'openInNewTab', 'urls', 'groups'];
 
             // Add all possible group keys (group00-group31)
             for (let i = 0; i < 32; i++) {
@@ -126,6 +127,7 @@ class BookmarkManager {
 
             // Load start page toggle state (default to true for existing users)
             this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
+            this.openInNewTab = result.openInNewTab !== undefined ? result.openInNewTab : true;
 
             // Check for data model version compatibility
             if (result.dataModelVersion && result.dataModelVersion !== this.dataModelVersion) {
@@ -167,7 +169,8 @@ class BookmarkManager {
                 lastUpdated: new Date().toISOString(),
                 version: '1.0',
                 dataModelVersion: this.dataModelVersion,
-                startPageEnabled: this.startPageEnabled
+                startPageEnabled: this.startPageEnabled,
+                openInNewTab: this.openInNewTab
             };
 
             // Ensure Ungrouped group is first in the list
@@ -363,6 +366,11 @@ class BookmarkManager {
         if (startPageToggle) {
             startPageToggle.addEventListener('change', (e) => this.handleStartPageToggle(e));
         }
+
+        const openNewTabToggle = document.getElementById('openNewTabToggle');
+        if (openNewTabToggle) {
+            openNewTabToggle.addEventListener('change', (e) => this.handleOpenNewTabToggle(e));
+        }
     }
 
     // Initialize Start Page Toggle
@@ -371,6 +379,12 @@ class BookmarkManager {
         if (startPageToggle) {
             // Set the toggle state based on loaded data
             startPageToggle.checked = this.startPageEnabled;
+        }
+
+        const openNewTabToggle = document.getElementById('openNewTabToggle');
+        if (openNewTabToggle) {
+            // Set the toggle state based on loaded data
+            openNewTabToggle.checked = this.openInNewTab;
         }
     }
 
@@ -394,6 +408,29 @@ class BookmarkManager {
             this.showError('Failed to save start page setting');
             // Revert the toggle state on error
             e.target.checked = this.startPageEnabled;
+        }
+    }
+
+    // Handle Open New Tab Toggle Change
+    async handleOpenNewTabToggle(e) {
+        try {
+            this.openInNewTab = e.target.checked;
+
+            // Save the new state
+            await this.saveData();
+
+            // Show feedback message
+            const message = this.openInNewTab
+                ? 'URLs will open in new tabs'
+                : 'URLs will open in current tab';
+            this.showMessage(message);
+
+            console.log('Open new tab toggle changed:', this.openInNewTab);
+        } catch (error) {
+            console.error('Error saving open new tab toggle state:', error);
+            this.showError('Failed to save open new tab setting');
+            // Revert the toggle state on error
+            e.target.checked = this.openInNewTab;
         }
     }
 
@@ -1009,10 +1046,17 @@ class BookmarkManager {
         }
     }
 
-    // Open URL in new tab
+    // Open URL in new tab or current tab based on toggle setting
     async openURL(url) {
         try {
-            await chrome.tabs.create({ url: url });
+            if (this.openInNewTab) {
+                // Open in new tab
+                await chrome.tabs.create({ url: url });
+            } else {
+                // Open in current tab
+                const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                await chrome.tabs.update(currentTab.id, { url: url });
+            }
             window.close(); // Close popup after opening URL
         } catch (error) {
             console.error('Error opening URL:', error);
@@ -2977,7 +3021,7 @@ class BookmarkManager {
     async exportData() {
         try {
             // Prepare keys for chunked storage
-            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'urls', 'groups'];
+            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'openInNewTab', 'urls', 'groups'];
 
             // Add all possible group keys (group00-group31)
             for (let i = 0; i < 32; i++) {
