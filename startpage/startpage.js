@@ -10,6 +10,7 @@ class StartPageApp {
         this.searchTerm = '';
         this.collapsedGroups = new Set();
         this.startPageEnabled = true; // Default to enabled
+        this.openInNewTab = true; // Default to opening in new tab
 
         this.elements = {
             groupsGrid: document.getElementById('groupsGrid'),
@@ -58,8 +59,9 @@ class StartPageApp {
     async checkStartPageToggle() {
         try {
             // Load the start page toggle state from chrome.storage.sync
-            const result = await chrome.storage.sync.get(['startPageEnabled']);
+            const result = await chrome.storage.sync.get(['startPageEnabled', 'openInNewTab']);
             this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
+            this.openInNewTab = result.openInNewTab !== undefined ? result.openInNewTab : true;
             console.log('Start page enabled:', this.startPageEnabled);
         } catch (error) {
             console.error('Error loading start page toggle state:', error);
@@ -347,6 +349,15 @@ class StartPageApp {
         bookmarkLink.setAttribute('href', url.url);
         bookmarkTitle.textContent = url.title;
 
+        // Set target based on toggle setting
+        if (this.openInNewTab) {
+            bookmarkLink.setAttribute('target', '_blank');
+            bookmarkLink.setAttribute('rel', 'noopener noreferrer');
+        } else {
+            bookmarkLink.removeAttribute('target');
+            bookmarkLink.removeAttribute('rel');
+        }
+
         // Set favicon
         bookmarkFavicon.src = url.favicon;
         bookmarkFavicon.alt = `${url.title} favicon`;
@@ -438,8 +449,8 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace === 'sync') {
-            // If start page toggle changed, reload the page immediately
-            if (changes.startPageEnabled) {
+            // If start page toggle or open new tab toggle changed, reload the page immediately
+            if (changes.startPageEnabled || changes.openInNewTab) {
                 window.location.reload();
                 return;
             }
