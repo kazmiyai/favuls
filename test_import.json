@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "exportDate": "2025-09-23T07:39:00.337Z",
+    "source": "FavURL Extension",
+    "storageFormat": "32-key",
+    "totalGroups": 6,
+    "totalUrls": 33
+  },
+  "groups": [
+    {
+      "color": "#2196f3",
+      "created": "2025-09-23T02:40:40.252Z",
+      "description": "",
+      "id": "ungrouped",
+      "isDefault": true,
+      "lastModified": "2025-09-23T02:41:06.791Z",
+      "name": "Ungrouped",
+      "order": 0,
+      "protected": true,
+      "urlCount": 1
+    },
+    {
+      "color": "#2196f3",
+      "created": "2025-09-23T02:41:18.160Z",
+      "description": "",
+      "id": "group_mfvy811s_g8kjd20sm",
+      "isDefault": false,
+      "lastModified": "2025-09-23T02:41:18.160Z",
+      "name": "ぴあ",
+      "order": 1,
+      "protected": false,
+      "urlCount": 7
+    },
+    {
+      "color": "#2196f3",
+      "created": "2025-09-23T05:30:18.460Z",
+      "description": "",
+      "id": "group_mfw49dcs_8dz9dkzqi",
+      "isDefault": false,
+      "lastModified": "2025-09-23T05:30:18.460Z",
+      "name": "渋谷区",
+      "order": 2,
+      "protected": false,
+      "urlCount": 7
+    }
+  ],
+  "urls": [
+    {
+      "created": "2025-09-23T02:45:04.401Z",
+      "domain": "script.google.com",
+      "favicon": "https://www.google.com/s2/favicons?domain=script.google.com&sz=16",
+      "groupId": "group_mfvy811s_g8kjd20sm",
+      "id": "url_mfvycvm9_gff46jivh",
+      "lastModified": "2025-09-23T02:45:21.423Z",
+      "order": 1758595504401,
+      "tags": [],
+      "timestamp": "2025-09-23T02:45:04.401Z",
+      "title": "GAS",
+      "url": "https://script.google.com/u/0/home"
+    },
+    {
+      "created": "2025-09-23T02:44:46.386Z",
+      "domain": "web.omnifocus.com",
+      "favicon": "https://www.google.com/s2/favicons?domain=web.omnifocus.com&sz=16",
+      "groupId": "group_mfvy811s_g8kjd20sm",
+      "id": "url_mfvychpu_hkitlyma0",
+      "lastModified": "2025-09-23T02:45:20.330Z",
+      "order": 1758595486386,
+      "tags": [],
+      "timestamp": "2025-09-23T02:44:46.386Z",
+      "title": "OmniFocus for the Web",
+      "url": "https://web.omnifocus.com/inbox"
+    },
+    {
+      "created": "2025-09-23T05:33:04.922Z",
+      "domain": "sid.softek.jp",
+      "favicon": "https://www.google.com/s2/favicons?domain=sid.softek.jp&sz=16",
+      "groupId": "group_mfw49dcs_8dz9dkzqi",
+      "id": "url_mfw4cxsq_440noavaa",
+      "lastModified": "2025-09-23T05:33:48.693Z",
+      "order": 1758605584922,
+      "tags": [],
+      "timestamp": "2025-09-23T05:33:04.922Z",
+      "title": "Security Information Directory for management - SIDfm",
+      "url": "https://sid.softek.jp/account/login"
+    },
+    {
+      "created": "2025-09-23T05:32:52.793Z",
+      "domain": "ap-northeast-1.signin.aws.amazon.com",
+      "favicon": "https://www.google.com/s2/favicons?domain=ap-northeast-1.signin.aws.amazon.com&sz=16",
+      "groupId": "group_mfw49dcs_8dz9dkzqi",
+      "id": "url_mfw4coft_myfitvvfb",
+      "lastModified": "2025-09-23T05:33:44.503Z",
+      "order": 1758605572793,
+      "tags": [],
+      "timestamp": "2025-09-23T05:32:52.793Z",
+      "title": "Amazon Web Services Sign-In",
+      "url": "https://ap-northeast-1.signin.aws.amazon.com/oauth?client_id=arn%3Aaws%3Aiam%3A%3A015428540659%3Auser%2Fcloudwatch&code_challenge=a3lgfC6QuQ_loqVB_JweYeP0E6XxWP1fWMNJIyhaqZI&code_challenge_method=SHA-256&redirect_uri=https%3A%2F%2Fap-northeast-1.console.aws.amazon.com%2Fcloudwatch%2Fhome%3Fregion%3Dap-northeast-1%26state%3DhashArgs%2523dashboards%253Aname%253Dproduction%26ca-oauth-flow-id%3Dwfry%26isauthcode%3Dtrue&response_type=code"
+    },
+    {
+      "created": "2025-09-23T05:32:10.156Z",
+      "domain": "aws-plus.backlog.jp",
+      "favicon": "https://www.google.com/s2/favicons?domain=aws-plus.backlog.jp&sz=16",
+      "groupId": "group_mfw49dcs_8dz9dkzqi",
+      "id": "url_mfw4brjg_nvls89dd7",
+      "lastModified": "2025-09-23T05:33:40.028Z",
+      "order": 1758605530156,
+      "tags": [],
+      "timestamp": "2025-09-23T05:32:10.156Z",
+      "title": "[PIA_SHIBUYAKU] ぴあ 渋谷区施設予約システム | プロジェクトホーム | Backlog",
+      "url": "https://aws-plus.backlog.jp/projects/PIA_SHIBUYAKU"
+    }
+  ]
+}

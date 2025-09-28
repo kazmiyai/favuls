@@ -126,28 +126,64 @@ class StartPageApp {
 
     async loadData() {
         try {
-            // Check for legacy single 'urls' key first, then load from new structure
-            const legacyResult = await chrome.storage.sync.get(['urls', 'groups']);
+            // Prepare keys for chunked storage
+            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'urls', 'groups'];
 
+            // Add all possible group keys (group00-group31)
+            for (let i = 0; i < 32; i++) {
+                keys.push(`group${i.toString().padStart(2, '0')}`);
+            }
+
+            // Add all possible URL keys (url000-url399)
+            for (let i = 0; i < 400; i++) {
+                keys.push(`url${i.toString().padStart(3, '0')}`);
+            }
+
+            const result = await chrome.storage.sync.get(keys);
+
+            // Initialize arrays
+            let groups = [];
             let urlsData = [];
 
-            // Check if we have legacy data
-            if (legacyResult.urls && Array.isArray(legacyResult.urls) && legacyResult.urls.length > 0) {
-                console.log('Loading from legacy single-key URL storage in start page...');
-                urlsData = legacyResult.urls;
-            } else {
-                // Load from new 32-key structure using utility function
-                console.log('Loading from new 32-key storage structure in start page...');
-                urlsData = await FavURLUtils.loadAllURLsFromStorage();
-                console.log(`Loaded ${urlsData.length} URLs from 32-key storage structure in start page`);
+            // Load groups from chunked storage or legacy format
+            if (result.groupCount || result.group00) {
+                // New chunked format
+                const groupCount = result.groupCount || 1; // At least 1 for ungrouped
+                for (let i = 0; i < groupCount && i < 32; i++) {
+                    const key = `group${i.toString().padStart(2, '0')}`;
+                    if (result[key]) {
+                        groups.push(result[key]);
+                    }
+                }
+                console.log(`Loaded ${groups.length} groups from chunked storage in start page`);
+            } else if (result.groups) {
+                // Legacy format
+                groups = result.groups;
+                console.log('Loading groups from legacy storage in start page...');
+            }
+
+            // Load URLs from chunked storage or legacy format
+            if (result.urlCount || result.url000) {
+                // New chunked format
+                const urlCount = result.urlCount || 0;
+                for (let i = 0; i < urlCount && i < 400; i++) {
+                    const key = `url${i.toString().padStart(3, '0')}`;
+                    if (result[key]) {
+                        urlsData.push(result[key]);
+                    }
+                }
+                console.log(`Loaded ${urlsData.length} URLs from chunked storage in start page`);
+            } else if (result.urls) {
+                // Legacy format
+                urlsData = result.urls;
+                console.log('Loading URLs from legacy storage in start page...');
             }
 
             // Process URLs
             this.urls = urlsData.map(urlData => URLDataModel.fromJSON(urlData));
 
             // Process groups and ensure default "Ungrouped" exists
-            let groups = legacyResult.groups || [];
-            const ungroupedExists = groups.some(group => group.id === 'ungrouped');
+            let ungroupedExists = groups.some(group => group.id === 'ungrouped');
 
             if (!ungroupedExists) {
                 groups.unshift({
@@ -408,8 +444,33 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
                 return;
             }
 
-            // If URLs or groups changed, reload the page data
+            // Check for changes in chunked storage or legacy storage
+            let hasDataChanges = false;
+
+            // Check for legacy format changes
             if (changes.urls || changes.groups) {
+                hasDataChanges = true;
+            }
+
+            // Check for chunked format changes
+            if (changes.urlCount || changes.groupCount) {
+                hasDataChanges = true;
+            }
+
+            // Check for any url### or group## key changes
+            for (const key in changes) {
+                if (key.startsWith('url') && /^url\d{3}$/.test(key)) {
+                    hasDataChanges = true;
+                    break;
+                }
+                if (key.startsWith('group') && /^group\d{2}$/.test(key)) {
+                    hasDataChanges = true;
+                    break;
+                }
+            }
+
+            // If any data changed, reload the page
+            if (hasDataChanges) {
                 window.location.reload();
             }
         }
