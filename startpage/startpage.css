@@ -327,3 +327,140 @@ body {
 .search-input:focus {
     outline: none; /* Custom focus style already applied */
 }
+
+/* Drag & Drop Styles */
+
+/* Drag handles */
+.group-drag-handle,
+.bookmark-drag-handle {
+    width: 16px;
+    height: 16px;
+    background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="%23999"><circle cx="3" cy="3" r="1"/><circle cx="8" cy="3" r="1"/><circle cx="13" cy="3" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="13" cy="8" r="1"/><circle cx="3" cy="13" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="13" cy="13" r="1"/></svg>');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px 12px;
+    cursor: grab;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.group-drag-handle:hover,
+.bookmark-drag-handle:hover {
+    opacity: 1;
+}
+
+.group-drag-handle:active,
+.bookmark-drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Group header with drag handle */
+.group-header {
+    position: relative;
+}
+
+.group-header.draggable {
+    cursor: grab;
+}
+
+.group-header.draggable:active {
+    cursor: grabbing;
+}
+
+/* Bookmark item with drag handle */
+.bookmark-item {
+    position: relative;
+}
+
+/* Drag states */
+.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+    z-index: 1000;
+}
+
+/* Group drag indicators */
+.group-header.drag-over {
+    background-color: #e3f2fd !important;
+    border: 2px dashed #2196f3;
+}
+
+.group-header.drag-over-top::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background-color: #2196f3;
+    border-radius: 2px;
+    z-index: 10;
+}
+
+.group-header.drag-over-bottom::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background-color: #2196f3;
+    border-radius: 2px;
+    z-index: 10;
+}
+
+/* Bookmark drag indicators */
+.bookmark-item.drag-over-top::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background-color: #2196f3;
+    border-radius: 2px;
+    z-index: 10;
+}
+
+.bookmark-item.drag-over-bottom::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background-color: #2196f3;
+    border-radius: 2px;
+    z-index: 10;
+}
+
+/* Prevent text selection during drag */
+.group-header.dragging,
+.bookmark-item.dragging {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Visual feedback for valid drop zones */
+.group-card.drag-target {
+    border: 2px dashed #4caf50;
+    background-color: #f1f8e9;
+}
+
+/* Ensure drag handles don't interfere with other interactions */
+.group-drag-handle,
+.bookmark-drag-handle {
+    z-index: 5;
+}
+
+/* Make drag handles more prominent during hover */
+.group-header:hover .group-drag-handle,
+.bookmark-item:hover .bookmark-drag-handle {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
