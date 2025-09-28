@@ -12,6 +12,9 @@ class StartPageApp {
         this.startPageEnabled = true; // Default to enabled
         this.openInNewTab = true; // Default to opening in new tab
 
+        // Initialize drag & drop manager
+        this.dragDropManager = new DragDropManager('startpage');
+
         this.elements = {
             groupsGrid: document.getElementById('groupsGrid'),
             emptyState: document.getElementById('emptyState'),
@@ -184,6 +187,13 @@ class StartPageApp {
             // Process URLs
             this.urls = urlsData.map(urlData => URLDataModel.fromJSON(urlData));
 
+            // Ensure URLs have order values
+            this.urls.forEach((url, index) => {
+                if (url.order === undefined || url.order === null) {
+                    url.order = index + 1;
+                }
+            });
+
             // Process groups and ensure default "Ungrouped" exists
             let ungroupedExists = groups.some(group => group.id === 'ungrouped');
 
@@ -206,6 +216,13 @@ class StartPageApp {
 
             // Update group URL counts
             this.updateGroupCounts();
+
+            // Ensure groups have order values
+            this.groups.forEach((group, index) => {
+                if (group.order === undefined || group.order === null) {
+                    group.order = index;
+                }
+            });
 
             // Sort groups by order, then by name
             this.groups.sort((a, b) => {
@@ -301,13 +318,16 @@ class StartPageApp {
     renderGroup(group, urls) {
         const template = this.elements.groupCardTemplate.content.cloneNode(true);
         const groupCard = template.querySelector('.group-card');
+        const groupHeader = template.querySelector('.group-header');
         const groupTitle = template.querySelector('.group-title');
         const groupCount = template.querySelector('.group-count');
         const bookmarksList = template.querySelector('.bookmarks-list');
         const collapseToggle = template.querySelector('.collapse-toggle');
+        const dragHandle = template.querySelector('.group-drag-handle');
 
         // Set group data
         groupCard.setAttribute('data-group-id', group.id);
+        groupHeader.setAttribute('data-group-id', group.id);
         groupTitle.textContent = group.name;
         groupCount.textContent = urls.length;
 
@@ -317,17 +337,66 @@ class StartPageApp {
             groupCard.classList.add('collapsed');
         }
 
+        // Configure drag & drop for groups (only if not protected)
+        const isDraggable = !group.protected && group.id !== 'ungrouped';
+        if (isDraggable) {
+            groupHeader.classList.add('draggable');
+
+            // Group drag events
+            groupHeader.addEventListener('dragstart', (e) => {
+                this.dragDropManager.handleGroupDragStart(e, group);
+            });
+
+            groupHeader.addEventListener('dragend', (e) => {
+                this.dragDropManager.handleGroupDragEnd(e);
+            });
+        } else {
+            // Remove drag handle for protected groups
+            if (dragHandle) {
+                dragHandle.remove();
+            }
+            groupHeader.removeAttribute('draggable');
+        }
+
+        // Unified drag and drop support (handles both group reordering and URL-to-group assignment)
+        groupHeader.addEventListener('dragover', (e) => {
+            this.dragDropManager.handleUnifiedDragOver(e, group.id);
+        });
+
+        groupHeader.addEventListener('drop', (e) => {
+            this.dragDropManager.handleUnifiedDrop(e, group.id, this);
+        });
+
+        groupHeader.addEventListener('dragenter', (e) => {
+            this.dragDropManager.handleUnifiedDragEnter(e, group.id);
+        });
+
+        groupHeader.addEventListener('dragleave', (e) => {
+            this.dragDropManager.handleUnifiedDragLeave(e);
+        });
+
         // Set up collapse toggle
         collapseToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleGroupCollapse(group.id);
         });
 
-        // Make entire header clickable for collapse/expand
-        const groupHeader = template.querySelector('.group-header');
-        groupHeader.addEventListener('click', () => {
+        // Make header clickable for collapse/expand (but not if clicking on drag handle)
+        groupHeader.addEventListener('click', (e) => {
+            // Don't trigger expand/collapse if clicking on drag handle
+            if (e.target.closest('.group-drag-handle')) {
+                e.preventDefault();
+                return;
+            }
             this.toggleGroupCollapse(group.id);
         });
+
+        // Prevent drag handle clicks from triggering other events
+        if (dragHandle) {
+            dragHandle.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
 
         // Render bookmarks
         urls.forEach(url => {
@@ -343,9 +412,12 @@ class StartPageApp {
         const bookmarkFavicon = template.querySelector('.bookmark-favicon');
         const bookmarkLink = template.querySelector('.bookmark-link');
         const bookmarkTitle = template.querySelector('.bookmark-title');
+        const dragHandle = template.querySelector('.bookmark-drag-handle');
 
         // Set bookmark data
         bookmarkItem.setAttribute('data-url', url.url);
+        bookmarkItem.setAttribute('data-url-id', url.id);
+        bookmarkItem.setAttribute('data-group-id', url.groupId);
         bookmarkLink.setAttribute('href', url.url);
         bookmarkTitle.textContent = url.title;
 
@@ -367,6 +439,40 @@ class StartPageApp {
             bookmarkFavicon.classList.add('error');
             bookmarkFavicon.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjVGNUY1IiByeD0iMiIvPgo8cGF0aCBkPSJNNCA2SDE0VjEwSDRWNloiIGZpbGw9IiNEREREREQiLz4KPHBhdGggZD0iTTYgOEgxMlY5SDZWOFoiIGZpbGw9IiNCQkJCQkIiLz4KPC9zdmc+';
         });
+
+        // Add drag-and-drop event listeners for bookmark reordering and group assignment
+        bookmarkItem.addEventListener('dragstart', (e) => {
+            this.dragDropManager.handleURLDragStart(e, url);
+        });
+
+        bookmarkItem.addEventListener('dragend', (e) => {
+            this.dragDropManager.handleURLDragEnd(e);
+        });
+
+        // Add URL-to-URL reordering support
+        bookmarkItem.addEventListener('dragover', (e) => {
+            this.dragDropManager.handleURLReorderDragOver(e, url);
+        });
+
+        bookmarkItem.addEventListener('drop', (e) => {
+            this.dragDropManager.handleURLReorderDrop(e, url, this);
+        });
+
+        bookmarkItem.addEventListener('dragenter', (e) => {
+            this.dragDropManager.handleURLReorderDragEnter(e, url);
+        });
+
+        bookmarkItem.addEventListener('dragleave', (e) => {
+            this.dragDropManager.handleURLReorderDragLeave(e);
+        });
+
+        // Prevent drag handle clicks from opening URL
+        if (dragHandle) {
+            dragHandle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+            });
+        }
 
         // Highlight search terms
         if (this.searchTerm) {
@@ -426,6 +532,52 @@ class StartPageApp {
             <h2>Error</h2>
             <p>${message}</p>
         `;
+    }
+
+    // Data persistence method for drag & drop operations
+    async saveData() {
+        try {
+            console.log('Saving data from start page...');
+
+            // Prepare URLs for chunked storage
+            const urlData = this.urls.map(url => url.toJSON());
+            const groupData = this.groups.map(group => group.toJSON());
+
+            // Build the data object to save in one operation
+            const dataToSave = {
+                urlCount: urlData.length,
+                groupCount: groupData.length
+            };
+
+            // Add URLs in chunks
+            if (urlData.length > 0) {
+                for (let i = 0; i < urlData.length; i++) {
+                    const key = `url${i.toString().padStart(3, '0')}`;
+                    dataToSave[key] = urlData[i];
+                }
+            }
+
+            // Add groups in chunks
+            if (groupData.length > 0) {
+                for (let i = 0; i < groupData.length; i++) {
+                    const key = `group${i.toString().padStart(2, '0')}`;
+                    dataToSave[key] = groupData[i];
+                }
+            }
+
+            // Save all data in one operation to avoid quota issues
+            await chrome.storage.sync.set(dataToSave);
+
+            console.log('Data saved successfully from start page in single operation');
+        } catch (error) {
+            console.error('Error saving data from start page:', error);
+            if (error.message && error.message.includes('QUOTA_BYTES_PER_ITEM')) {
+                console.error('Chrome storage quota exceeded - data too large');
+            } else if (error.message && error.message.includes('MAX_WRITE_OPERATIONS_PER_MINUTE')) {
+                console.error('Chrome storage write quota exceeded - too many operations');
+            }
+            throw error;
+        }
     }
 }
 

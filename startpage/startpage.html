@@ -43,7 +43,8 @@
     <!-- Group Card Template -->
     <template id="groupCardTemplate">
         <div class="group-card" data-group-id="">
-            <div class="group-header">
+            <div class="group-header" draggable="true">
+                <div class="group-drag-handle" title="Drag to reorder group"></div>
                 <button class="collapse-toggle" aria-label="Toggle group visibility">
                     <span class="collapse-icon">▼</span>
                 </button>
@@ -60,7 +61,8 @@
 
     <!-- Bookmark Item Template -->
     <template id="bookmarkTemplate">
-        <div class="bookmark-item" data-url="">
+        <div class="bookmark-item" data-url="" draggable="true">
+            <div class="bookmark-drag-handle" title="Drag to reorder bookmark"></div>
             <img class="bookmark-favicon" src="" alt="Favicon" loading="lazy">
             <a class="bookmark-link" href="" target="_blank" rel="noopener noreferrer">
                 <span class="bookmark-title"></span>
@@ -70,6 +72,7 @@
 
     <!-- Load shared utilities and models -->
     <script src="../utils/shared.js"></script>
+    <script src="../utils/dragDrop.js"></script>
     <script src="../models/URLDataModel.js"></script>
     <script src="../models/GroupDataModel.js"></script>
     <script src="startpage.js"></script>
