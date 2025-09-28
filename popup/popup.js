@@ -400,6 +400,11 @@ class BookmarkManager {
     // Current Tab URL Capture (Task 2.3 core functionality)
     async captureCurrentTab() {
         try {
+            // Check URL limit before capturing
+            if (!this.checkURLLimit()) {
+                return;
+            }
+
             this.showLoading('Capturing current tab...');
 
             // Get current active tab
@@ -1149,8 +1154,7 @@ class BookmarkManager {
     openCreateGroupModal() {
         try {
             // Check group limit before opening modal
-            if (this.groups.length >= 50) {
-                this.showError('Maximum number of groups (50) reached. Please delete a group before creating a new one.');
+            if (!this.checkGroupLimit()) {
                 return;
             }
 
@@ -1253,8 +1257,8 @@ class BookmarkManager {
             }
 
             // Check group limit
-            if (this.groups.length >= 50) {
-                throw new Error('Maximum number of groups (50) reached');
+            if (!this.checkGroupLimit()) {
+                throw new Error('Maximum number of groups (32) reached');
             }
 
             // Create new group using data model
@@ -1450,12 +1454,37 @@ class BookmarkManager {
     }
 
     canCreateMoreGroups() {
-        return this.groups.length < 50;
+        return this.groups.length < 32;
+    }
+
+    canAddMoreURLs() {
+        return this.urls.length < 400;
+    }
+
+    checkGroupLimit() {
+        if (this.groups.length >= 32) {
+            this.showError('Maximum number of groups (32) reached. Please delete a group before creating a new one.');
+            return false;
+        }
+        return true;
+    }
+
+    checkURLLimit() {
+        if (this.urls.length >= 400) {
+            this.showError('Maximum number of URLs (400) reached. Please delete some URLs before adding new ones.');
+            return false;
+        }
+        return true;
     }
 
     // URL Management Methods (Task 4.3: URL Group Assignment)
     openAddURLModal() {
         try {
+            // Check URL limit before opening modal
+            if (!this.checkURLLimit()) {
+                return;
+            }
+
             // Clone template content
             const template = document.getElementById('addURLModalTemplate');
             const footerTemplate = document.getElementById('addURLModalFooterTemplate');
@@ -1670,6 +1699,12 @@ class BookmarkManager {
     // URL CRUD Operations (Task 4.3)
     async handleAddURL(form) {
         try {
+            // Check URL limit before adding
+            if (!this.checkURLLimit()) {
+                this.hideLoading();
+                return;
+            }
+
             this.showLoading('Adding URL...');
 
             // Get form data
