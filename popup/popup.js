@@ -125,44 +125,12 @@ class BookmarkManager {
             }
 
             // Load start page toggle state (default to true for existing users)
-            this.startPageEnabled = legacyResult.startPageEnabled !== undefined ? legacyResult.startPageEnabled : true;
-
-            // Check if we have legacy data that needs migration
-            if (legacyResult.urls && Array.isArray(legacyResult.urls) && legacyResult.urls.length > 0) {
-                console.log('Legacy single-key URL storage detected, migrating to 32-key structure...');
-
-                // Load legacy data
-                this.urls = (legacyResult.urls || []).map(urlData => URLDataModel.fromJSON(urlData));
-                this.groups = (legacyResult.groups || []).map(groupData => GroupDataModel.fromJSON(groupData));
-
-                // Ensure default group exists before migration
-                this.initializeDefaultGroup();
-
-                // Migrate to new storage structure
-                await this.migrateLegacyStorageToNewStructure();
-
-                console.log('Legacy data migration completed');
-            } else {
-                // Load from new 32-key structure
-                console.log('Loading from new 32-key storage structure...');
-
-                // Load groups first
-                this.groups = (legacyResult.groups || []).map(groupData => GroupDataModel.fromJSON(groupData));
-
-                // Ensure default group exists
-                this.initializeDefaultGroup();
-
-                // Load URLs from all storage keys using new utility function
-                const allUrlsData = await FavURLUtils.loadAllURLsFromStorage();
-                this.urls = allUrlsData.map(urlData => URLDataModel.fromJSON(urlData));
-
-                console.log(`Loaded ${this.urls.length} URLs from 32-key storage structure`);
-            }
+            this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
 
             // Check for data model version compatibility
-            if (legacyResult.dataModelVersion && legacyResult.dataModelVersion !== this.dataModelVersion) {
-                console.log(`Data model migration needed: ${legacyResult.dataModelVersion} -> ${this.dataModelVersion}`);
-                await this.migrateDataModel(legacyResult.dataModelVersion);
+            if (result.dataModelVersion && result.dataModelVersion !== this.dataModelVersion) {
+                console.log(`Data model migration needed: ${result.dataModelVersion} -> ${this.dataModelVersion}`);
+                await this.migrateDataModel(result.dataModelVersion);
             }
 
             // Validate data integrity and fix issues
@@ -194,28 +162,62 @@ class BookmarkManager {
 
     async saveData() {
         try {
-            // Check storage quota before saving
-            const dataSize = this.calculateDataSize();
-            if (dataSize > this.storageQuotaLimit) {
-                throw new Error(`Storage quota exceeded. Data size: ${Math.round(dataSize/1024)}KB, Limit: ${Math.round(this.storageQuotaLimit/1024)}KB`);
-            }
-
-            // Save data with storage quota management (Task 3.3: Serialize data models)
-            const serializedData = {
-                urls: this.urls.map(url => url.toJSON()),
-                groups: this.groups.map(group => group.toJSON()),
+            // Prepare storage data object
+            const storageData = {
                 lastUpdated: new Date().toISOString(),
                 version: '1.0',
                 dataModelVersion: this.dataModelVersion,
                 startPageEnabled: this.startPageEnabled
             };
 
-            await chrome.storage.sync.set(serializedData);
+            // Ensure Ungrouped group is first in the list
+            const ungroupedGroup = this.groups.find(g => g.id === 'ungrouped');
+            const otherGroups = this.groups.filter(g => g.id !== 'ungrouped');
+
+            // Save groups in chunked format (group00-group31)
+            if (ungroupedGroup) {
+                storageData['group00'] = ungroupedGroup.toJSON();
+            }
+
+            // Save other groups (maximum 31 additional groups)
+            for (let i = 0; i < otherGroups.length && i < 31; i++) {
+                storageData[`group${(i + 1).toString().padStart(2, '0')}`] = otherGroups[i].toJSON();
+            }
+            storageData.groupCount = Math.min(this.groups.length, 32);
+
+            // Save URLs in chunked format (url000-url399)
+            for (let i = 0; i < this.urls.length && i < 400; i++) {
+                storageData[`url${i.toString().padStart(3, '0')}`] = this.urls[i].toJSON();
+            }
+            storageData.urlCount = Math.min(this.urls.length, 400);
+
+            // Clean up old format data if it exists
+            const keysToRemove = ['urls', 'groups'];
+            await chrome.storage.sync.remove(keysToRemove);
+
+            // Clean up unused chunk keys
+            const currentGroupCount = storageData.groupCount || 0;
+            const currentUrlCount = storageData.urlCount || 0;
+
+            const cleanupKeys = [];
+            for (let i = currentGroupCount; i < 32; i++) {
+                cleanupKeys.push(`group${i.toString().padStart(2, '0')}`);
+            }
+            for (let i = currentUrlCount; i < 400; i++) {
+                cleanupKeys.push(`url${i.toString().padStart(3, '0')}`);
+            }
+
+            if (cleanupKeys.length > 0) {
+                await chrome.storage.sync.remove(cleanupKeys);
+            }
+
+            // Save data to storage
+            await chrome.storage.sync.set(storageData);
 
             // Update storage quota tracking
             await this.updateStorageQuota();
 
-            console.log('Data saved successfully to chrome.storage.sync');
+            console.log('Data saved successfully to chrome.storage.sync using chunked format');
         } catch (error) {
             console.error('Error saving data:', error);
             if (error.message.includes('quota')) {
@@ -2939,20 +2941,65 @@ class BookmarkManager {
     // Export functionality
     async exportData() {
         try {
+            // Prepare keys for chunked storage
+            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'urls', 'groups'];
+
+            // Add all possible group keys (group00-group31)
+            for (let i = 0; i < 32; i++) {
+                keys.push(`group${i.toString().padStart(2, '0')}`);
+            }
+
+            // Add all possible URL keys (url000-url399)
+            for (let i = 0; i < 400; i++) {
+                keys.push(`url${i.toString().padStart(3, '0')}`);
+            }
+
             // Load current data from storage
-            const result = await chrome.storage.sync.get(['urls', 'groups']);
+            const result = await chrome.storage.sync.get(keys);
+
+            // Reconstruct groups array from chunked storage or legacy format
+            let groups = [];
+            if (result.groupCount || result.group00) {
+                // New chunked format
+                const groupCount = result.groupCount || 1; // At least 1 for ungrouped
+                for (let i = 0; i < groupCount && i < 32; i++) {
+                    const key = `group${i.toString().padStart(2, '0')}`;
+                    if (result[key]) {
+                        groups.push(result[key]);
+                    }
+                }
+            } else if (result.groups) {
+                // Legacy format
+                groups = result.groups;
+            }
+
+            // Reconstruct URLs array from chunked storage or legacy format
+            let urls = [];
+            if (result.urlCount || result.url000) {
+                // New chunked format
+                const urlCount = result.urlCount || 0;
+                for (let i = 0; i < urlCount && i < 400; i++) {
+                    const key = `url${i.toString().padStart(3, '0')}`;
+                    if (result[key]) {
+                        urls.push(result[key]);
+                    }
+                }
+            } else if (result.urls) {
+                // Legacy format
+                urls = result.urls;
+            }
 
             // Create export data with metadata
             const exportData = {
                 metadata: {
-                    version: "1.1",
+                    version: "1.0",
                     exportDate: new Date().toISOString(),
                     source: "FavURL Extension",
-                    totalGroups: (result.groups || []).length,
-                    totalUrls: (result.urls || []).length
+                    totalGroups: groups.length,
+                    totalUrls: urls.length
                 },
-                groups: result.groups || [],
-                urls: result.urls || []
+                groups: groups,
+                urls: urls
             };
 
             // Convert to JSON
@@ -3248,11 +3295,43 @@ class BookmarkManager {
                 return;
             }
 
-            // Directly replace all data with import data
-            await chrome.storage.sync.set({
-                groups: importData.groups,
-                urls: importData.urls
+            // Apply URL and group limits
+            const limitedUrls = importData.urls.slice(0, 400);
+            const limitedGroups = importData.groups.slice(0, 32);
+
+            // Convert imported data to data model instances
+            this.urls = limitedUrls.map(urlData => {
+                if (urlData instanceof URLDataModel) {
+                    return urlData;
+                }
+                return URLDataModel.fromJSON(urlData);
             });
+
+            this.groups = limitedGroups.map(groupData => {
+                if (groupData instanceof GroupDataModel) {
+                    return groupData;
+                }
+                return GroupDataModel.fromJSON(groupData);
+            });
+
+            // Ensure default "Ungrouped" group exists and has correct properties
+            this.initializeDefaultGroup();
+
+            // Clear all existing storage (both old and new formats)
+            const keysToRemove = ['urls', 'groups', 'groupCount', 'urlCount'];
+
+            // Add all possible chunk keys for cleanup
+            for (let i = 0; i < 32; i++) {
+                keysToRemove.push(`group${i.toString().padStart(2, '0')}`);
+            }
+            for (let i = 0; i < 400; i++) {
+                keysToRemove.push(`url${i.toString().padStart(3, '0')}`);
+            }
+
+            await chrome.storage.sync.remove(keysToRemove);
+
+            // Save the new data using the chunked storage format
+            await this.saveData();
 
             // Reload data and UI
             await this.loadData();
