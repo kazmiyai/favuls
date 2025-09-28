@@ -126,14 +126,27 @@ class StartPageApp {
 
     async loadData() {
         try {
-            // Load data from Chrome storage
-            const result = await chrome.storage.sync.get(['urls', 'groups']);
+            // Check for legacy single 'urls' key first, then load from new structure
+            const legacyResult = await chrome.storage.sync.get(['urls', 'groups']);
+
+            let urlsData = [];
+
+            // Check if we have legacy data
+            if (legacyResult.urls && Array.isArray(legacyResult.urls) && legacyResult.urls.length > 0) {
+                console.log('Loading from legacy single-key URL storage in start page...');
+                urlsData = legacyResult.urls;
+            } else {
+                // Load from new 32-key structure using utility function
+                console.log('Loading from new 32-key storage structure in start page...');
+                urlsData = await FavURLUtils.loadAllURLsFromStorage();
+                console.log(`Loaded ${urlsData.length} URLs from 32-key storage structure in start page`);
+            }
 
             // Process URLs
-            this.urls = (result.urls || []).map(urlData => URLDataModel.fromJSON(urlData));
+            this.urls = urlsData.map(urlData => URLDataModel.fromJSON(urlData));
 
             // Process groups and ensure default "Ungrouped" exists
-            let groups = result.groups || [];
+            let groups = legacyResult.groups || [];
             const ungroupedExists = groups.some(group => group.id === 'ungrouped');
 
             if (!ungroupedExists) {
@@ -239,7 +252,8 @@ class StartPageApp {
 
         // Render each group
         this.filteredData.groups.forEach(group => {
-            const groupUrls = this.filteredData.urls.filter(url => url.groupId === group.id);
+            const groupUrls = this.filteredData.urls.filter(url => url.groupId === group.id)
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
             if (groupUrls.length > 0) {
                 this.renderGroup(group, groupUrls);
             }
