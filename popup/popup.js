@@ -2356,6 +2356,10 @@ class BookmarkManager {
             return;
         }
 
+        // Save dragged group reference before it gets cleared by dragend event
+        const draggedGroup = this.draggedGroup;
+        const draggedGroupName = draggedGroup.name;
+
         try {
             // Remove visual feedback from all headers
             document.querySelectorAll('.group-header').forEach(header => {
@@ -2399,16 +2403,16 @@ class BookmarkManager {
             }
 
             console.log('Group reorder drop: executing', {
-                draggedGroup: this.draggedGroup.name,
-                oldOrder: this.draggedGroup.order,
+                draggedGroup: draggedGroupName,
+                oldOrder: draggedGroup.order,
                 newOrder
             });
 
-            this.showLoading(`Moving "${this.draggedGroup.name}" group...`);
+            this.showLoading(`Moving "${draggedGroupName}" group...`);
 
             // Update the dragged group's order
-            this.draggedGroup.order = newOrder;
-            this.draggedGroup.lastModified = new Date().toISOString();
+            draggedGroup.order = newOrder;
+            draggedGroup.lastModified = new Date().toISOString();
 
             // Normalize all group orders to integers
             this.normalizeGroupOrders();
@@ -2420,11 +2424,11 @@ class BookmarkManager {
             this.renderURLs();
 
             // Show success message
-            this.showMessage(`Group "${this.draggedGroup.name}" moved successfully!`);
+            this.showMessage(`Group "${draggedGroupName}" moved successfully!`);
 
             this.hideLoading();
 
-            console.log(`Group "${this.draggedGroup.name}" moved to position ${newOrder} successfully`);
+            console.log(`Group "${draggedGroupName}" moved to position ${newOrder} successfully`);
 
         } catch (error) {
             console.error('Error reordering group:', error);
