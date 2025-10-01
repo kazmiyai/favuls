@@ -566,12 +566,17 @@ class BookmarkManager {
 
         if (!urlList) return;
 
+        // Clone empty state before clearing (to preserve the element)
+        const emptyStateClone = emptyState ? emptyState.cloneNode(true) : null;
+
         // Clear existing content
         urlList.innerHTML = '';
 
         if (this.urls.length === 0) {
             // Show empty state
-            urlList.appendChild(emptyState);
+            if (emptyStateClone) {
+                urlList.appendChild(emptyStateClone);
+            }
             return;
         }
 
