@@ -76,70 +76,29 @@ class BookmarkManager {
     // Data Management (Task 3.3: Enhanced with data models)
     async loadData() {
         try {
-            // Prepare keys for chunked storage
-            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'openInNewTab', 'urls', 'groups'];
+            // Use StorageManager to load data
+            const data = await StorageManager.loadDataFromStorage();
 
-            // Add all possible group keys (group00-group31)
-            for (let i = 0; i < 32; i++) {
-                keys.push(`group${i.toString().padStart(2, '0')}`);
-            }
+            // Convert raw data to model instances
+            this.groups = data.groups.map(groupData => GroupDataModel.fromJSON(groupData));
+            this.urls = data.urls.map(urlData => URLDataModel.fromJSON(urlData));
 
-            // Add all possible URL keys (url000-url399)
-            for (let i = 0; i < 400; i++) {
-                keys.push(`url${i.toString().padStart(3, '0')}`);
-            }
-
-            const result = await chrome.storage.sync.get(keys);
-
-            // Initialize arrays
-            this.groups = [];
-            this.urls = [];
-
-            // Load groups from chunked storage or legacy format
-            if (result.groupCount || result.group00) {
-                // New chunked format
-                const groupCount = result.groupCount || 1; // At least 1 for ungrouped
-                for (let i = 0; i < groupCount && i < 32; i++) {
-                    const key = `group${i.toString().padStart(2, '0')}`;
-                    if (result[key]) {
-                        this.groups.push(GroupDataModel.fromJSON(result[key]));
-                    }
-                }
-            } else if (result.groups) {
-                // Legacy format - convert to data model instances
-                this.groups = result.groups.map(groupData => GroupDataModel.fromJSON(groupData));
-            }
-
-            // Load URLs from chunked storage or legacy format
-            if (result.urlCount || result.url000) {
-                // New chunked format
-                const urlCount = result.urlCount || 0;
-                for (let i = 0; i < urlCount && i < 400; i++) {
-                    const key = `url${i.toString().padStart(3, '0')}`;
-                    if (result[key]) {
-                        this.urls.push(URLDataModel.fromJSON(result[key]));
-                    }
-                }
-            } else if (result.urls) {
-                // Legacy format - convert to data model instances
-                this.urls = result.urls.map(urlData => URLDataModel.fromJSON(urlData));
-            }
-
-            // Load start page toggle state (default to true for existing users)
-            this.startPageEnabled = result.startPageEnabled !== undefined ? result.startPageEnabled : true;
-            this.openInNewTab = result.openInNewTab !== undefined ? result.openInNewTab : true;
+            // Load metadata
+            this.startPageEnabled = data.metadata.startPageEnabled;
+            this.openInNewTab = data.metadata.openInNewTab;
 
             // Check for data model version compatibility
-            if (result.dataModelVersion && result.dataModelVersion !== this.dataModelVersion) {
-                console.log(`Data model migration needed: ${result.dataModelVersion} -> ${this.dataModelVersion}`);
-                await this.migrateDataModel(result.dataModelVersion);
+            if (data.metadata.dataModelVersion && data.metadata.dataModelVersion !== this.dataModelVersion) {
+                console.log(`Data model migration needed: ${data.metadata.dataModelVersion} -> ${this.dataModelVersion}`);
+                await this.migrateDataModel(data.metadata.dataModelVersion);
             }
 
             // Validate data integrity and fix issues
-            await this.validateAndFixDataIntegrity();
-
-            // Update URL counts in groups
-            this.updateGroupUrlCounts();
+            this.lastDataValidation = DataValidator.validateAndFixDataIntegrity(
+                this.groups,
+                this.urls,
+                this.getDefaultGroupId()
+            );
 
             // Initialize group orders for existing groups
             this.initializeGroupOrders();
@@ -164,66 +123,24 @@ class BookmarkManager {
 
     async saveData() {
         try {
-            // Prepare storage data object
-            const storageData = {
-                lastUpdated: new Date().toISOString(),
+            // Prepare metadata
+            const metadata = {
                 version: '1.0',
                 dataModelVersion: this.dataModelVersion,
                 startPageEnabled: this.startPageEnabled,
                 openInNewTab: this.openInNewTab
             };
 
-            // Ensure Ungrouped group is first in the list
-            const ungroupedGroup = this.groups.find(g => g.id === 'ungrouped');
-            const otherGroups = this.groups.filter(g => g.id !== 'ungrouped');
-
-            // Save groups in chunked format (group00-group31)
-            if (ungroupedGroup) {
-                storageData['group00'] = ungroupedGroup.toJSON();
-            }
-
-            // Save other groups (maximum 31 additional groups)
-            for (let i = 0; i < otherGroups.length && i < 31; i++) {
-                storageData[`group${(i + 1).toString().padStart(2, '0')}`] = otherGroups[i].toJSON();
-            }
-            storageData.groupCount = Math.min(this.groups.length, 32);
-
-            // Save URLs in chunked format (url000-url399)
-            for (let i = 0; i < this.urls.length && i < 400; i++) {
-                storageData[`url${i.toString().padStart(3, '0')}`] = this.urls[i].toJSON();
-            }
-            storageData.urlCount = Math.min(this.urls.length, 400);
-
-            // Clean up old format data if it exists
-            const keysToRemove = ['urls', 'groups'];
-            await chrome.storage.sync.remove(keysToRemove);
-
-            // Clean up unused chunk keys
-            const currentGroupCount = storageData.groupCount || 0;
-            const currentUrlCount = storageData.urlCount || 0;
-
-            const cleanupKeys = [];
-            for (let i = currentGroupCount; i < 32; i++) {
-                cleanupKeys.push(`group${i.toString().padStart(2, '0')}`);
-            }
-            for (let i = currentUrlCount; i < 400; i++) {
-                cleanupKeys.push(`url${i.toString().padStart(3, '0')}`);
-            }
-
-            if (cleanupKeys.length > 0) {
-                await chrome.storage.sync.remove(cleanupKeys);
-            }
-
-            // Save data to storage
-            await chrome.storage.sync.set(storageData);
+            // Use StorageManager to save data
+            await StorageManager.saveDataToStorage(this.groups, this.urls, metadata);
 
             // Update storage quota tracking
             await this.updateStorageQuota();
 
-            console.log('Data saved successfully to chrome.storage.sync using chunked format');
+            console.log('Data saved successfully using StorageManager');
         } catch (error) {
             console.error('Error saving data:', error);
-            if (error.message.includes('quota')) {
+            if (error.message.includes('quota') || error.message.includes('Storage limit')) {
                 this.showError('Storage limit reached. Consider deleting old bookmarks.');
             } else {
                 this.showError('Failed to save bookmarks: ' + error.message);
@@ -525,95 +442,7 @@ class BookmarkManager {
     }
 
     // Data Model Management (Task 3.3)
-    async validateAndFixDataIntegrity() {
-        const result = {
-            hasChanges: false,
-            urlsFixed: 0,
-            groupsFixed: 0,
-            validationErrors: []
-        };
-
-        // Validate and fix URL data
-        result.urlsFixed = this.validateAndFixURLs();
-
-        // Validate and fix group data
-        result.groupsFixed = this.validateAndFixGroups();
-
-        // Update group URL counts
-        this.updateGroupUrlCounts();
-
-        result.hasChanges = result.urlsFixed > 0 || result.groupsFixed > 0;
-        this.lastDataValidation = result;
-
-        if (result.hasChanges) {
-            console.log(`Data integrity check: Fixed ${result.urlsFixed} URLs and ${result.groupsFixed} groups`);
-        }
-
-        return result;
-    }
-
-    validateAndFixURLs() {
-        let fixedCount = 0;
-        const defaultGroupId = this.getDefaultGroupId();
-
-        this.urls.forEach((url, index) => {
-            // Convert plain objects to URLDataModel instances if needed
-            if (!(url instanceof URLDataModel)) {
-                this.urls[index] = URLDataModel.fromJSON(url);
-                fixedCount++;
-            }
-
-            // Check if URL has a valid group assignment
-            if (!url.groupId || !this.groups.find(g => g.id === url.groupId)) {
-                url.groupId = defaultGroupId;
-                url.lastModified = new Date().toISOString();
-                fixedCount++;
-            }
-
-            // Validate URL data integrity
-            const validation = url.validate();
-            if (!validation.isValid) {
-                console.warn(`URL validation failed for ${url.id}:`, validation.errors);
-            }
-        });
-
-        return fixedCount;
-    }
-
-    validateAndFixGroups() {
-        let fixedCount = 0;
-
-        this.groups.forEach((group, index) => {
-            // Convert plain objects to GroupDataModel instances if needed
-            if (!(group instanceof GroupDataModel)) {
-                this.groups[index] = GroupDataModel.fromJSON(group);
-                fixedCount++;
-            }
-
-            // Validate group data integrity
-            const validation = group.validate();
-            if (!validation.isValid) {
-                console.warn(`Group validation failed for ${group.id}:`, validation.errors);
-            }
-        });
-
-        return fixedCount;
-    }
-
-    updateGroupUrlCounts() {
-        // Reset all counts
-        this.groups.forEach(group => {
-            group.urlCount = 0;
-        });
-
-        // Count URLs in each group
-        this.urls.forEach(url => {
-            const group = this.groups.find(g => g.id === url.groupId);
-            if (group) {
-                group.urlCount++;
-            }
-        });
-    }
+    // Data validation methods moved to DataValidator utility
 
     initializeGroupOrders() {
         let hasChanges = false;
@@ -737,12 +566,17 @@ class BookmarkManager {
 
         if (!urlList) return;
 
+        // Clone empty state before clearing (to preserve the element)
+        const emptyStateClone = emptyState ? emptyState.cloneNode(true) : null;
+
         // Clear existing content
         urlList.innerHTML = '';
 
         if (this.urls.length === 0) {
             // Show empty state
-            urlList.appendChild(emptyState);
+            if (emptyStateClone) {
+                urlList.appendChild(emptyStateClone);
+            }
             return;
         }
 
@@ -2522,6 +2356,10 @@ class BookmarkManager {
             return;
         }
 
+        // Save dragged group reference before it gets cleared by dragend event
+        const draggedGroup = this.draggedGroup;
+        const draggedGroupName = draggedGroup.name;
+
         try {
             // Remove visual feedback from all headers
             document.querySelectorAll('.group-header').forEach(header => {
@@ -2565,16 +2403,16 @@ class BookmarkManager {
             }
 
             console.log('Group reorder drop: executing', {
-                draggedGroup: this.draggedGroup.name,
-                oldOrder: this.draggedGroup.order,
+                draggedGroup: draggedGroupName,
+                oldOrder: draggedGroup.order,
                 newOrder
             });
 
-            this.showLoading(`Moving "${this.draggedGroup.name}" group...`);
+            this.showLoading(`Moving "${draggedGroupName}" group...`);
 
             // Update the dragged group's order
-            this.draggedGroup.order = newOrder;
-            this.draggedGroup.lastModified = new Date().toISOString();
+            draggedGroup.order = newOrder;
+            draggedGroup.lastModified = new Date().toISOString();
 
             // Normalize all group orders to integers
             this.normalizeGroupOrders();
@@ -2586,11 +2424,11 @@ class BookmarkManager {
             this.renderURLs();
 
             // Show success message
-            this.showMessage(`Group "${this.draggedGroup.name}" moved successfully!`);
+            this.showMessage(`Group "${draggedGroupName}" moved successfully!`);
 
             this.hideLoading();
 
-            console.log(`Group "${this.draggedGroup.name}" moved to position ${newOrder} successfully`);
+            console.log(`Group "${draggedGroupName}" moved to position ${newOrder} successfully`);
 
         } catch (error) {
             console.error('Error reordering group:', error);
@@ -2841,19 +2679,17 @@ class BookmarkManager {
 
     async updateStorageQuota() {
         try {
-            const usage = await chrome.storage.sync.getBytesInUse();
-            this.storageQuotaUsed = usage;
-            console.log(`Storage usage: ${usage} bytes (${Math.round(usage/1024 * 100)/100}KB)`);
+            const usage = await StorageManager.getStorageUsage();
+            this.storageQuotaUsed = usage.bytesInUse;
+            console.log(`Storage usage: ${usage.formatted}`);
         } catch (error) {
             console.warn('Could not get storage usage:', error);
         }
     }
 
     async getStorageInfo() {
-        const usageKB = Math.round(this.storageQuotaUsed / 1024 * 100) / 100;
-        const limitKB = Math.round(this.storageQuotaLimit / 1024);
-        const percentage = Math.round((this.storageQuotaUsed / this.storageQuotaLimit) * 100);
-        return `${usageKB}KB/${limitKB}KB (${percentage}%)`;
+        const usage = await StorageManager.getStorageUsage();
+        return usage.formatted;
     }
 
     async optimizeStorage() {
