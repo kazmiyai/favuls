@@ -1,6 +1,9 @@
 // Background script for FavURL Chrome Extension
 // Manifest V3 Service Worker
 
+// Import storage manager utilities
+importScripts('../utils/storageManager.js');
+
 // Extension installation and updates
 chrome.runtime.onInstalled.addListener((details) => {
     console.log('FavURL extension installed/updated:', details.reason);
@@ -122,8 +125,8 @@ async function initializeExtension() {
         }
 
         // Log storage usage
-        const usage = await chrome.storage.sync.getBytesInUse();
-        console.log(`Extension initialized. Storage usage: ${usage} bytes (${Math.round(usage/1024 * 100)/100}KB)`);
+        const usage = await StorageManager.getStorageUsage();
+        console.log(`Extension initialized. Storage usage: ${usage.formatted}`);
 
     } catch (error) {
         console.error('Error initializing extension:', error);
@@ -155,8 +158,8 @@ async function initializeExtension() {
 
             console.log('Fallback initialization completed');
 
-            const usage = await chrome.storage.sync.getBytesInUse();
-            console.log(`Fallback storage usage: ${usage} bytes (${Math.round(usage/1024 * 100)/100}KB)`);
+            const usage = await StorageManager.getStorageUsage();
+            console.log(`Fallback storage usage: ${usage.formatted}`);
         } catch (fallbackError) {
             console.error('Fallback initialization failed:', fallbackError);
         }
@@ -192,8 +195,8 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
 
         // Update storage usage tracking
         try {
-            const usage = await chrome.storage.sync.getBytesInUse();
-            console.log(`Current storage usage: ${usage} bytes (${Math.round(usage/1024 * 100)/100}KB)`);
+            const usage = await StorageManager.getStorageUsage();
+            console.log(`Current storage usage: ${usage.formatted}`);
         } catch (error) {
             console.warn('Could not get storage usage:', error);
         }

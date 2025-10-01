@@ -131,61 +131,11 @@ class StartPageApp {
 
     async loadData() {
         try {
-            // Prepare keys for chunked storage
-            const keys = ['groupCount', 'urlCount', 'dataModelVersion', 'startPageEnabled', 'urls', 'groups'];
+            // Use StorageManager to load data
+            const data = await StorageManager.loadDataFromStorage();
 
-            // Add all possible group keys (group00-group31)
-            for (let i = 0; i < 32; i++) {
-                keys.push(`group${i.toString().padStart(2, '0')}`);
-            }
-
-            // Add all possible URL keys (url000-url399)
-            for (let i = 0; i < 400; i++) {
-                keys.push(`url${i.toString().padStart(3, '0')}`);
-            }
-
-            const result = await chrome.storage.sync.get(keys);
-
-            // Initialize arrays
-            let groups = [];
-            let urlsData = [];
-
-            // Load groups from chunked storage or legacy format
-            if (result.groupCount || result.group00) {
-                // New chunked format
-                const groupCount = result.groupCount || 1; // At least 1 for ungrouped
-                for (let i = 0; i < groupCount && i < 32; i++) {
-                    const key = `group${i.toString().padStart(2, '0')}`;
-                    if (result[key]) {
-                        groups.push(result[key]);
-                    }
-                }
-                console.log(`Loaded ${groups.length} groups from chunked storage in start page`);
-            } else if (result.groups) {
-                // Legacy format
-                groups = result.groups;
-                console.log('Loading groups from legacy storage in start page...');
-            }
-
-            // Load URLs from chunked storage or legacy format
-            if (result.urlCount || result.url000) {
-                // New chunked format
-                const urlCount = result.urlCount || 0;
-                for (let i = 0; i < urlCount && i < 400; i++) {
-                    const key = `url${i.toString().padStart(3, '0')}`;
-                    if (result[key]) {
-                        urlsData.push(result[key]);
-                    }
-                }
-                console.log(`Loaded ${urlsData.length} URLs from chunked storage in start page`);
-            } else if (result.urls) {
-                // Legacy format
-                urlsData = result.urls;
-                console.log('Loading URLs from legacy storage in start page...');
-            }
-
-            // Process URLs
-            this.urls = urlsData.map(urlData => URLDataModel.fromJSON(urlData));
+            // Process URLs - convert to model instances
+            this.urls = data.urls.map(urlData => URLDataModel.fromJSON(urlData));
 
             // Ensure URLs have order values
             this.urls.forEach((url, index) => {
@@ -194,7 +144,10 @@ class StartPageApp {
                 }
             });
 
-            // Process groups and ensure default "Ungrouped" exists
+            // Process groups - convert to model instances
+            let groups = data.groups;
+
+            // Ensure default "Ungrouped" exists
             let ungroupedExists = groups.some(group => group.id === 'ungrouped');
 
             if (!ungroupedExists) {
@@ -214,8 +167,8 @@ class StartPageApp {
 
             this.groups = groups.map(groupData => GroupDataModel.fromJSON(groupData));
 
-            // Update group URL counts
-            this.updateGroupCounts();
+            // Update group URL counts using DataValidator
+            DataValidator.updateGroupUrlCounts(this.groups, this.urls);
 
             // Ensure groups have order values
             this.groups.forEach((group, index) => {
@@ -235,26 +188,14 @@ class StartPageApp {
             // Filter data initially (no search term)
             this.filterData('');
 
+            console.log(`Start page loaded ${this.groups.length} groups and ${this.urls.length} URLs using StorageManager`);
         } catch (error) {
             console.error('Error loading data:', error);
             throw error;
         }
     }
 
-    updateGroupCounts() {
-        // Reset counts
-        this.groups.forEach(group => {
-            group.urlCount = 0;
-        });
-
-        // Count URLs in each group
-        this.urls.forEach(url => {
-            const group = this.groups.find(g => g.id === url.groupId);
-            if (group) {
-                group.urlCount++;
-            }
-        });
-    }
+    // Moved to DataValidator utility - updateGroupUrlCounts()
 
     handleSearch(searchTerm) {
         this.searchTerm = searchTerm.toLowerCase().trim();
@@ -539,39 +480,19 @@ class StartPageApp {
         try {
             console.log('Saving data from start page...');
 
-            // Prepare URLs for chunked storage
-            const urlData = this.urls.map(url => url.toJSON());
-            const groupData = this.groups.map(group => group.toJSON());
-
-            // Build the data object to save in one operation
-            const dataToSave = {
-                urlCount: urlData.length,
-                groupCount: groupData.length
+            // Prepare metadata (use existing values from storage or defaults)
+            const metadata = {
+                version: '1.0',
+                dataModelVersion: '1.0'
             };
 
-            // Add URLs in chunks
-            if (urlData.length > 0) {
-                for (let i = 0; i < urlData.length; i++) {
-                    const key = `url${i.toString().padStart(3, '0')}`;
-                    dataToSave[key] = urlData[i];
-                }
-            }
+            // Use StorageManager to save data
+            await StorageManager.saveDataToStorage(this.groups, this.urls, metadata);
 
-            // Add groups in chunks
-            if (groupData.length > 0) {
-                for (let i = 0; i < groupData.length; i++) {
-                    const key = `group${i.toString().padStart(2, '0')}`;
-                    dataToSave[key] = groupData[i];
-                }
-            }
-
-            // Save all data in one operation to avoid quota issues
-            await chrome.storage.sync.set(dataToSave);
-
-            console.log('Data saved successfully from start page in single operation');
+            console.log('Data saved successfully from start page using StorageManager');
         } catch (error) {
             console.error('Error saving data from start page:', error);
-            if (error.message && error.message.includes('QUOTA_BYTES_PER_ITEM')) {
+            if (error.message && (error.message.includes('quota') || error.message.includes('Storage limit'))) {
                 console.error('Chrome storage quota exceeded - data too large');
             } else if (error.message && error.message.includes('MAX_WRITE_OPERATIONS_PER_MINUTE')) {
                 console.error('Chrome storage write quota exceeded - too many operations');
