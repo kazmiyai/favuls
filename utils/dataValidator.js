@@ -191,27 +191,6 @@ function canDeleteGroup(group) {
     return !group.protected && group.id !== 'ungrouped';
 }
 
-/**
- * Removes orphaned URLs (URLs without valid groups)
- * @param {Array} urls - Array of URL objects
- * @param {Array} groups - Array of group objects
- * @returns {number} Number of URLs removed
- */
-function removeOrphanedURLs(urls, groups) {
-    const validGroupIds = new Set(groups.map(g => g.id));
-    const before = urls.length;
-
-    // Filter out URLs with invalid group IDs
-    urls.splice(0, urls.length, ...urls.filter(url => validGroupIds.has(url.groupId)));
-
-    const removed = before - urls.length;
-    if (removed > 0) {
-        console.log(`Removed ${removed} orphaned URLs`);
-    }
-
-    return removed;
-}
-
 // Export functions for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     // Node.js environment
@@ -224,8 +203,7 @@ if (typeof module !== 'undefined' && module.exports) {
         findDuplicateURLs,
         isValidURL,
         validateGroupName,
-        canDeleteGroup,
-        removeOrphanedURLs
+        canDeleteGroup
     };
 } else {
     // Browser environment - attach to window
@@ -238,7 +216,6 @@ if (typeof module !== 'undefined' && module.exports) {
         findDuplicateURLs,
         isValidURL,
         validateGroupName,
-        canDeleteGroup,
-        removeOrphanedURLs
+        canDeleteGroup
     };
 }

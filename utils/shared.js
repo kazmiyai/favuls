@@ -123,116 +123,6 @@ function getAllURLStorageKeys() {
     return keys;
 }
 
-/**
- * Loads URLs from all storage keys and combines them
- * @returns {Promise<Array>} Combined array of all URLs
- */
-async function loadAllURLsFromStorage() {
-    try {
-        const allKeys = getAllURLStorageKeys();
-        const result = await chrome.storage.sync.get(allKeys);
-
-        const allUrls = [];
-        for (const key of allKeys) {
-            if (result[key] && Array.isArray(result[key])) {
-                allUrls.push(...result[key]);
-            }
-        }
-
-        return allUrls;
-    } catch (error) {
-        console.error('Error loading URLs from storage:', error);
-        return [];
-    }
-}
-
-/**
- * Saves URLs to their appropriate storage keys based on group assignment
- * @param {Array} urls - Array of URL objects
- * @param {Array} groups - Array of group objects
- * @returns {Promise<void>}
- */
-async function saveURLsToStorage(urls, groups) {
-    try {
-        // Create storage data object with all URL keys initialized as empty arrays
-        const storageData = {};
-        for (let i = 0; i <= 31; i++) {
-            storageData[getURLStorageKey(i)] = [];
-        }
-
-        // Distribute URLs to their appropriate storage keys
-        for (const url of urls) {
-            const storageIndex = getStorageIndexForGroup(url.groupId, groups);
-            const storageKey = getURLStorageKey(storageIndex);
-            storageData[storageKey].push(url);
-        }
-
-        // Save to chrome.storage.sync
-        await chrome.storage.sync.set(storageData);
-
-        console.log('URLs saved to storage with new 32-key structure');
-    } catch (error) {
-        console.error('Error saving URLs to storage:', error);
-        throw error;
-    }
-}
-
-/**
- * Moves a URL from one storage key to another when group changes
- * @param {string} urlId - The URL ID to move
- * @param {string} fromGroupId - The source group ID
- * @param {string} toGroupId - The destination group ID
- * @param {Array} groups - Array of group objects
- * @returns {Promise<void>}
- */
-async function moveURLBetweenStorageKeys(urlId, fromGroupId, toGroupId, groups) {
-    try {
-        const fromIndex = getStorageIndexForGroup(fromGroupId, groups);
-        const toIndex = getStorageIndexForGroup(toGroupId, groups);
-
-        // If moving to the same storage key, no storage operation needed
-        if (fromIndex === toIndex) {
-            return;
-        }
-
-        const fromKey = getURLStorageKey(fromIndex);
-        const toKey = getURLStorageKey(toIndex);
-
-        // Load both storage keys
-        const result = await chrome.storage.sync.get([fromKey, toKey]);
-        const fromUrls = result[fromKey] || [];
-        const toUrls = result[toKey] || [];
-
-        // Find and remove URL from source
-        const urlIndex = fromUrls.findIndex(url => url.id === urlId);
-        if (urlIndex === -1) {
-            console.warn(`URL ${urlId} not found in storage key ${fromKey}`);
-            return;
-        }
-
-        const urlToMove = fromUrls.splice(urlIndex, 1)[0];
-
-        // Update the URL's groupId
-        urlToMove.groupId = toGroupId;
-        urlToMove.lastModified = new Date().toISOString();
-
-        // Add URL to destination
-        toUrls.push(urlToMove);
-
-        // Save both keys
-        const updateData = {};
-        updateData[fromKey] = fromUrls;
-        updateData[toKey] = toUrls;
-
-        await chrome.storage.sync.set(updateData);
-
-        console.log(`URL ${urlId} moved from ${fromKey} to ${toKey}`);
-    } catch (error) {
-        console.error('Error moving URL between storage keys:', error);
-        throw error;
-    }
-}
-
 // Export functions for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     // Node.js environment
@@ -244,10 +134,7 @@ if (typeof module !== 'undefined' && module.exports) {
         isValidURL,
         getURLStorageKey,
         getStorageIndexForGroup,
-        getAllURLStorageKeys,
-        loadAllURLsFromStorage,
-        saveURLsToStorage,
-        moveURLBetweenStorageKeys
+        getAllURLStorageKeys
     };
 } else {
     // Browser environment - attach to window
@@ -259,9 +146,6 @@ if (typeof module !== 'undefined' && module.exports) {
         isValidURL,
         getURLStorageKey,
         getStorageIndexForGroup,
-        getAllURLStorageKeys,
-        loadAllURLsFromStorage,
-        saveURLsToStorage,
-        moveURLBetweenStorageKeys
+        getAllURLStorageKeys
     };
 }
