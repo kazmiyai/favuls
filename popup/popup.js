@@ -1856,6 +1856,9 @@ class BookmarkManager {
             return;
         }
 
+        // Store dragged URL title for error handling
+        const draggedURLTitle = this.draggedURL.title;
+
         try {
             // Remove visual feedback from all URL items
             document.querySelectorAll('.url-item').forEach(item => {
@@ -1886,12 +1889,12 @@ class BookmarkManager {
             }
 
             console.log('URL reorder drop: executing', {
-                draggedURL: this.draggedURL.title,
+                draggedURL: draggedURLTitle,
                 oldOrder: this.draggedURL.order,
                 newOrder
             });
 
-            this.showLoading(`Moving "${this.draggedURL.title}"...`);
+            this.showLoading(`Moving "${draggedURLTitle}"...`);
 
             // Update the dragged URL's order
             this.draggedURL.order = newOrder;
@@ -1907,11 +1910,11 @@ class BookmarkManager {
             this.renderURLs();
 
             // Show success message
-            this.showMessage(`"${this.draggedURL.title}" moved successfully!`);
+            this.showMessage(`"${draggedURLTitle}" moved successfully!`);
 
             this.hideLoading();
 
-            console.log(`URL "${this.draggedURL.title}" moved to position ${newOrder} successfully`);
+            console.log(`URL "${draggedURLTitle}" moved to position ${newOrder} successfully`);
 
         } catch (error) {
             console.error('Error reordering URL:', error);
