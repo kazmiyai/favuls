@@ -1,4 +1,11 @@
 /* Reset and Base Styles */
+:root {
+    /* Default color theme - can be overridden via CSS custom properties */
+    --page-bg: #f5f5f5;
+    --group-header-bg: #fafafa;
+    --url-item-bg: #ffffff;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -451,7 +458,7 @@ body {
     border: 1px solid #e9ecef;
     border-radius: 8px;
     margin-bottom: 8px;
-    background-color: white;
+    background-color: var(--url-item-bg, white);
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
@@ -665,7 +672,7 @@ body {
     margin: 8px 0 0 0;
     border: 1px solid #e9ecef;
     border-radius: 8px 8px 0 0;
-    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    background: var(--group-header-bg, #fafafa);
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
@@ -1060,6 +1067,12 @@ body {
     outline: none;
     border-color: #4A90E2;
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.color-hex-input {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
 }
 
 .color-preview {
