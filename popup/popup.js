@@ -19,6 +19,8 @@ class BookmarkManager {
         // Start page toggle state
         this.startPageEnabled = true; // Default to enabled
         this.openInNewTab = true; // Default to opening in new tab
+        // Color theme state
+        this.colorTheme = null; // Will be loaded from storage
         this.init();
     }
 
@@ -87,6 +89,7 @@ class BookmarkManager {
             // Load metadata
             this.startPageEnabled = data.metadata.startPageEnabled;
             this.openInNewTab = data.metadata.openInNewTab;
+            this.colorTheme = data.metadata.colorTheme;
 
             // Check for data model version compatibility
             if (data.metadata.dataModelVersion && data.metadata.dataModelVersion !== this.dataModelVersion) {
@@ -129,7 +132,8 @@ class BookmarkManager {
                 version: '1.0',
                 dataModelVersion: this.dataModelVersion,
                 startPageEnabled: this.startPageEnabled,
-                openInNewTab: this.openInNewTab
+                openInNewTab: this.openInNewTab,
+                colorTheme: this.colorTheme
             };
 
             // Use StorageManager to save data
@@ -3473,6 +3477,9 @@ class BookmarkManager {
                 urlItemBackground: urlColor
             };
 
+            // Update instance variable so it's preserved in saveData()
+            this.colorTheme = colorTheme;
+
             await StorageManager.saveColorTheme(colorTheme);
 
             // Apply colors immediately to popup
@@ -3493,6 +3500,9 @@ class BookmarkManager {
 
             // Get default colors and update inputs
             const defaultTheme = StorageManager.getDefaultColorTheme();
+
+            // Update instance variable so it's preserved in saveData()
+            this.colorTheme = defaultTheme;
 
             const pageColorInput = document.getElementById('pageBackgroundColor');
             const pageColorHexInput = document.getElementById('pageBackgroundColorHex');
