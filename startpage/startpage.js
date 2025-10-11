@@ -48,6 +48,9 @@ class StartPageApp {
             // Load and apply color theme
             await this.loadAndApplyColorTheme();
 
+            // Load and apply font settings
+            await this.loadAndApplyFontSettings();
+
             // Set up event listeners
             this.setupEventListeners();
 
@@ -523,6 +526,26 @@ class StartPageApp {
         document.documentElement.style.setProperty('--group-header-bg', colorTheme.groupHeaderBackground);
         document.documentElement.style.setProperty('--url-item-bg', colorTheme.urlItemBackground);
     }
+
+    // Font Settings Functions
+    async loadAndApplyFontSettings() {
+        try {
+            const fontSettings = await StorageManager.loadFontSettings();
+            this.applyFontSettings(fontSettings);
+        } catch (error) {
+            console.error('Error loading font settings:', error);
+        }
+    }
+
+    applyFontSettings(fontSettings) {
+        // Apply font settings to startpage using CSS custom properties
+        document.documentElement.style.setProperty('--group-title-font-family', fontSettings.groupTitle.family);
+        document.documentElement.style.setProperty('--group-title-font-size', fontSettings.groupTitle.size);
+        document.documentElement.style.setProperty('--group-title-font-color', fontSettings.groupTitle.color);
+        document.documentElement.style.setProperty('--url-item-font-family', fontSettings.urlItem.family);
+        document.documentElement.style.setProperty('--url-item-font-size', fontSettings.urlItem.size);
+        document.documentElement.style.setProperty('--url-item-font-color', fontSettings.urlItem.color);
+    }
 }
 
 // Initialize the start page when DOM is loaded
@@ -553,6 +576,12 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
 
             // If color theme changed, reload the page to apply new colors
             if (changes.colorTheme) {
+                window.location.reload();
+                return;
+            }
+
+            // If font settings changed, reload the page to apply new fonts
+            if (changes.fontSettings) {
                 window.location.reload();
                 return;
             }

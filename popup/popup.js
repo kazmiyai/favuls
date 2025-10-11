@@ -21,6 +21,8 @@ class BookmarkManager {
         this.openInNewTab = true; // Default to opening in new tab
         // Color theme state
         this.colorTheme = null; // Will be loaded from storage
+        // Font settings state
+        this.fontSettings = null; // Will be loaded from storage
         this.init();
     }
 
@@ -90,6 +92,7 @@ class BookmarkManager {
             this.startPageEnabled = data.metadata.startPageEnabled;
             this.openInNewTab = data.metadata.openInNewTab;
             this.colorTheme = data.metadata.colorTheme;
+            this.fontSettings = data.metadata.fontSettings;
 
             // Check for data model version compatibility
             if (data.metadata.dataModelVersion && data.metadata.dataModelVersion !== this.dataModelVersion) {
@@ -133,7 +136,8 @@ class BookmarkManager {
                 dataModelVersion: this.dataModelVersion,
                 startPageEnabled: this.startPageEnabled,
                 openInNewTab: this.openInNewTab,
-                colorTheme: this.colorTheme
+                colorTheme: this.colorTheme,
+                fontSettings: this.fontSettings
             };
 
             // Use StorageManager to save data
@@ -247,6 +251,15 @@ class BookmarkManager {
             colorSettingsBtn.addEventListener('click', () => {
                 this.closeMenu();
                 this.openColorSettingsModal();
+            });
+        }
+
+        // Font settings button
+        const fontSettingsBtn = document.getElementById('fontSettings');
+        if (fontSettingsBtn) {
+            fontSettingsBtn.addEventListener('click', () => {
+                this.closeMenu();
+                this.openFontSettingsModal();
             });
         }
 
@@ -3545,6 +3558,257 @@ class BookmarkManager {
             this.applyColorTheme(colorTheme);
         } catch (error) {
             console.error('Error loading color theme:', error);
+        }
+    }
+
+    // Font Settings Modal Functions
+    async openFontSettingsModal() {
+        try {
+            // Load current font settings
+            const fontSettings = await StorageManager.loadFontSettings();
+
+            // Get templates
+            const template = document.getElementById('fontSettingsModalTemplate');
+            const footerTemplate = document.getElementById('fontSettingsModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Font settings templates not found');
+                this.showToast('Font settings unavailable');
+                return;
+            }
+
+            // Clone template content
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Set current values for group title
+            const groupFamilySelect = modalBody.getElementById('groupTitleFontFamily');
+            const groupSizeRange = modalBody.getElementById('groupTitleFontSize');
+            const groupSizeNumber = modalBody.getElementById('groupTitleFontSizeNumber');
+            const groupColorInput = modalBody.getElementById('groupTitleFontColor');
+            const groupColorHex = modalBody.getElementById('groupTitleFontColorHex');
+
+            if (groupFamilySelect) groupFamilySelect.value = fontSettings.groupTitle.family;
+            if (groupSizeRange && groupSizeNumber) {
+                const sizeValue = parseInt(fontSettings.groupTitle.size);
+                groupSizeRange.value = sizeValue;
+                groupSizeNumber.value = sizeValue;
+            }
+            if (groupColorInput && groupColorHex) {
+                groupColorInput.value = fontSettings.groupTitle.color;
+                groupColorHex.value = fontSettings.groupTitle.color;
+            }
+
+            // Set current values for URL item
+            const urlFamilySelect = modalBody.getElementById('urlItemFontFamily');
+            const urlSizeRange = modalBody.getElementById('urlItemFontSize');
+            const urlSizeNumber = modalBody.getElementById('urlItemFontSizeNumber');
+            const urlColorInput = modalBody.getElementById('urlItemFontColor');
+            const urlColorHex = modalBody.getElementById('urlItemFontColorHex');
+
+            if (urlFamilySelect) urlFamilySelect.value = fontSettings.urlItem.family;
+            if (urlSizeRange && urlSizeNumber) {
+                const sizeValue = parseInt(fontSettings.urlItem.size);
+                urlSizeRange.value = sizeValue;
+                urlSizeNumber.value = sizeValue;
+            }
+            if (urlColorInput && urlColorHex) {
+                urlColorInput.value = fontSettings.urlItem.color;
+                urlColorHex.value = fontSettings.urlItem.color;
+            }
+
+            // Open modal
+            this.openModal('Font Settings', modalBody, modalFooter);
+
+            // Setup event listeners after modal is opened
+            setTimeout(() => {
+                this.setupFontSettingsListeners();
+            }, 100);
+
+        } catch (error) {
+            console.error('Error opening font settings modal:', error);
+            this.showToast('Failed to open font settings');
+        }
+    }
+
+    setupFontSettingsListeners() {
+        // Sync range sliders with number inputs
+        const syncSizeInputs = (rangeInput, numberInput) => {
+            if (!rangeInput || !numberInput) return;
+
+            rangeInput.addEventListener('input', (e) => {
+                numberInput.value = e.target.value;
+            });
+
+            numberInput.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                if (value >= 10 && value <= 32) {
+                    rangeInput.value = value;
+                }
+            });
+        };
+
+        syncSizeInputs(
+            document.getElementById('groupTitleFontSize'),
+            document.getElementById('groupTitleFontSizeNumber')
+        );
+        syncSizeInputs(
+            document.getElementById('urlItemFontSize'),
+            document.getElementById('urlItemFontSizeNumber')
+        );
+
+        // Sync color pickers with hex inputs
+        const syncColorInputs = (colorInput, hexInput) => {
+            if (!colorInput || !hexInput) return;
+
+            colorInput.addEventListener('input', (e) => {
+                hexInput.value = e.target.value.toUpperCase();
+            });
+
+            hexInput.addEventListener('input', (e) => {
+                const value = e.target.value;
+                if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                    colorInput.value = value;
+                }
+            });
+        };
+
+        syncColorInputs(
+            document.getElementById('groupTitleFontColor'),
+            document.getElementById('groupTitleFontColorHex')
+        );
+        syncColorInputs(
+            document.getElementById('urlItemFontColor'),
+            document.getElementById('urlItemFontColorHex')
+        );
+
+        // Save button
+        const form = document.getElementById('fontSettingsForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.saveFontSettings();
+            });
+        }
+
+        // Cancel button
+        const cancelBtn = document.getElementById('cancelFontSettings');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.closeModal();
+            });
+        }
+
+        // Reset button
+        const resetBtn = document.getElementById('resetFontSettings');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', async () => {
+                await this.resetFontSettings();
+            });
+        }
+    }
+
+    async saveFontSettings() {
+        try {
+            const groupFamily = document.getElementById('groupTitleFontFamily')?.value;
+            const groupSize = document.getElementById('groupTitleFontSizeNumber')?.value;
+            const groupColor = document.getElementById('groupTitleFontColorHex')?.value;
+            const urlFamily = document.getElementById('urlItemFontFamily')?.value;
+            const urlSize = document.getElementById('urlItemFontSizeNumber')?.value;
+            const urlColor = document.getElementById('urlItemFontColorHex')?.value;
+
+            // Validate inputs
+            const colorPattern = /^#[0-9A-Fa-f]{6}$/;
+            if (!colorPattern.test(groupColor) || !colorPattern.test(urlColor)) {
+                this.showToast('Invalid color format. Please use hex format (#RRGGBB)');
+                return;
+            }
+
+            const groupSizeNum = parseInt(groupSize);
+            const urlSizeNum = parseInt(urlSize);
+            if (groupSizeNum < 10 || groupSizeNum > 32 || urlSizeNum < 10 || urlSizeNum > 32) {
+                this.showToast('Font size must be between 10 and 32 pixels');
+                return;
+            }
+
+            const fontSettings = {
+                groupTitle: {
+                    family: groupFamily,
+                    size: `${groupSizeNum}px`,
+                    color: groupColor
+                },
+                urlItem: {
+                    family: urlFamily,
+                    size: `${urlSizeNum}px`,
+                    color: urlColor
+                }
+            };
+
+            // Update instance variable so it's preserved in saveData()
+            this.fontSettings = fontSettings;
+
+            await StorageManager.saveFontSettings(fontSettings);
+
+            this.closeModal();
+            this.showToast('Font settings saved successfully');
+
+        } catch (error) {
+            console.error('Error saving font settings:', error);
+            this.showToast('Failed to save font settings');
+        }
+    }
+
+    async resetFontSettings() {
+        try {
+            await StorageManager.resetFontSettings();
+
+            // Get default settings and update inputs
+            const defaultSettings = StorageManager.getDefaultFontSettings();
+
+            // Update instance variable so it's preserved in saveData()
+            this.fontSettings = defaultSettings;
+
+            // Update group title inputs
+            const groupFamilySelect = document.getElementById('groupTitleFontFamily');
+            const groupSizeRange = document.getElementById('groupTitleFontSize');
+            const groupSizeNumber = document.getElementById('groupTitleFontSizeNumber');
+            const groupColorInput = document.getElementById('groupTitleFontColor');
+            const groupColorHex = document.getElementById('groupTitleFontColorHex');
+
+            if (groupFamilySelect) groupFamilySelect.value = defaultSettings.groupTitle.family;
+            if (groupSizeRange && groupSizeNumber) {
+                const sizeValue = parseInt(defaultSettings.groupTitle.size);
+                groupSizeRange.value = sizeValue;
+                groupSizeNumber.value = sizeValue;
+            }
+            if (groupColorInput && groupColorHex) {
+                groupColorInput.value = defaultSettings.groupTitle.color;
+                groupColorHex.value = defaultSettings.groupTitle.color;
+            }
+
+            // Update URL item inputs
+            const urlFamilySelect = document.getElementById('urlItemFontFamily');
+            const urlSizeRange = document.getElementById('urlItemFontSize');
+            const urlSizeNumber = document.getElementById('urlItemFontSizeNumber');
+            const urlColorInput = document.getElementById('urlItemFontColor');
+            const urlColorHex = document.getElementById('urlItemFontColorHex');
+
+            if (urlFamilySelect) urlFamilySelect.value = defaultSettings.urlItem.family;
+            if (urlSizeRange && urlSizeNumber) {
+                const sizeValue = parseInt(defaultSettings.urlItem.size);
+                urlSizeRange.value = sizeValue;
+                urlSizeNumber.value = sizeValue;
+            }
+            if (urlColorInput && urlColorHex) {
+                urlColorInput.value = defaultSettings.urlItem.color;
+                urlColorHex.value = defaultSettings.urlItem.color;
+            }
+
+            this.showToast('Fonts reset to defaults');
+
+        } catch (error) {
+            console.error('Error resetting fonts:', error);
+            this.showToast('Failed to reset fonts');
         }
     }
 }

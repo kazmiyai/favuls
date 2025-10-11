@@ -55,6 +55,10 @@
                             <span class="menu-item-icon">🎨</span>
                             <span class="menu-item-text">Color...</span>
                         </button>
+                        <button class="menu-item" id="fontSettings" role="menuitem">
+                            <span class="menu-item-icon">🔤</span>
+                            <span class="menu-item-text">Font...</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -431,6 +435,150 @@
         <button type="button" class="btn btn-secondary" id="resetColorTheme">Reset to Defaults</button>
         <button type="button" class="btn btn-secondary" id="cancelColorSettings">Cancel</button>
         <button type="submit" class="btn btn-primary" form="colorSettingsForm" id="saveColorSettings">Save Colors</button>
+    </template>
+
+    <!-- Font Settings Modal Template (hidden) -->
+    <template id="fontSettingsModalTemplate">
+        <form class="font-settings-form" id="fontSettingsForm">
+            <!-- Group Title Font Settings -->
+            <h3 class="section-title">Group Title Font</h3>
+
+            <div class="form-group">
+                <label class="form-label" for="groupTitleFontFamily">Font Family</label>
+                <select class="form-select"
+                        id="groupTitleFontFamily"
+                        name="groupTitleFontFamily"
+                        aria-label="Select font family for group titles">
+                    <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">System Default</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="'Verdana', sans-serif">Verdana</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                    <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                    <option value="'Impact', sans-serif">Impact</option>
+                </select>
+                <div class="form-help">Choose a font for group titles</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="groupTitleFontSize">Font Size</label>
+                <div class="size-input-container">
+                    <input type="range"
+                           class="form-range-input"
+                           id="groupTitleFontSize"
+                           name="groupTitleFontSize"
+                           min="10"
+                           max="32"
+                           value="16"
+                           aria-label="Select font size for group titles">
+                    <input type="number"
+                           class="form-input size-number-input"
+                           id="groupTitleFontSizeNumber"
+                           name="groupTitleFontSizeNumber"
+                           min="10"
+                           max="32"
+                           value="16">
+                    <span class="size-unit">px</span>
+                </div>
+                <div class="form-help">Font size (10-32 pixels)</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="groupTitleFontColor">Font Color</label>
+                <div class="color-picker-container">
+                    <input type="color"
+                           class="form-color-input"
+                           id="groupTitleFontColor"
+                           name="groupTitleFontColor"
+                           value="#333333"
+                           aria-label="Choose font color for group titles">
+                    <input type="text"
+                           class="form-input color-hex-input"
+                           id="groupTitleFontColorHex"
+                           name="groupTitleFontColorHex"
+                           value="#333333"
+                           pattern="^#[0-9A-Fa-f]{6}$"
+                           maxlength="7"
+                           placeholder="#333333">
+                </div>
+                <div class="form-help">Font color for group titles</div>
+            </div>
+
+            <!-- URL Item Font Settings -->
+            <h3 class="section-title">URL Item Font</h3>
+
+            <div class="form-group">
+                <label class="form-label" for="urlItemFontFamily">Font Family</label>
+                <select class="form-select"
+                        id="urlItemFontFamily"
+                        name="urlItemFontFamily"
+                        aria-label="Select font family for URL items">
+                    <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">System Default</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="'Verdana', sans-serif">Verdana</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                    <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                    <option value="'Impact', sans-serif">Impact</option>
+                </select>
+                <div class="form-help">Choose a font for URL items</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="urlItemFontSize">Font Size</label>
+                <div class="size-input-container">
+                    <input type="range"
+                           class="form-range-input"
+                           id="urlItemFontSize"
+                           name="urlItemFontSize"
+                           min="10"
+                           max="32"
+                           value="14"
+                           aria-label="Select font size for URL items">
+                    <input type="number"
+                           class="form-input size-number-input"
+                           id="urlItemFontSizeNumber"
+                           name="urlItemFontSizeNumber"
+                           min="10"
+                           max="32"
+                           value="14">
+                    <span class="size-unit">px</span>
+                </div>
+                <div class="form-help">Font size (10-32 pixels)</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="urlItemFontColor">Font Color</label>
+                <div class="color-picker-container">
+                    <input type="color"
+                           class="form-color-input"
+                           id="urlItemFontColor"
+                           name="urlItemFontColor"
+                           value="#333333"
+                           aria-label="Choose font color for URL items">
+                    <input type="text"
+                           class="form-input color-hex-input"
+                           id="urlItemFontColorHex"
+                           name="urlItemFontColorHex"
+                           value="#333333"
+                           pattern="^#[0-9A-Fa-f]{6}$"
+                           maxlength="7"
+                           placeholder="#333333">
+                </div>
+                <div class="form-help">Font color for URL items</div>
+            </div>
+        </form>
+    </template>
+
+    <!-- Font Settings Modal Footer Template (hidden) -->
+    <template id="fontSettingsModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="resetFontSettings">Reset to Defaults</button>
+        <button type="button" class="btn btn-secondary" id="cancelFontSettings">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="fontSettingsForm" id="saveFontSettings">Save Fonts</button>
     </template>
 
     <!-- Loading Spinner (placeholder for future implementation) -->
