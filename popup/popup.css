@@ -57,6 +57,13 @@ body {
     letter-spacing: 0.5px;
 }
 
+.header-title .version {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+    margin-left: 6px;
+}
+
 .header-subtitle {
     font-size: 14px;
     opacity: 0.9;

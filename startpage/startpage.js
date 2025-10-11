@@ -11,6 +11,8 @@ class StartPageApp {
         this.collapsedGroups = new Set();
         this.startPageEnabled = true; // Default to enabled
         this.openInNewTab = true; // Default to opening in new tab
+        this.colorTheme = null; // Will be loaded from storage
+        this.fontSettings = null; // Will be loaded from storage
 
         // Initialize drag & drop manager
         this.dragDropManager = new DragDropManager('startpage');
@@ -59,6 +61,9 @@ class StartPageApp {
 
             // Render the page
             this.render();
+
+            // Display version
+            this.displayVersion();
         } catch (error) {
             console.error('Failed to initialize start page:', error);
             this.showError('Failed to load bookmarks. Please try refreshing the page.');
@@ -489,10 +494,14 @@ class StartPageApp {
         try {
             console.log('Saving data from start page...');
 
-            // Prepare metadata (use existing values from storage or defaults)
+            // Prepare metadata (preserve existing settings to prevent reset)
             const metadata = {
                 version: '1.0',
-                dataModelVersion: '1.0'
+                dataModelVersion: '1.0',
+                startPageEnabled: this.startPageEnabled,
+                openInNewTab: this.openInNewTab,
+                colorTheme: this.colorTheme,
+                fontSettings: this.fontSettings
             };
 
             // Use StorageManager to save data
@@ -513,8 +522,8 @@ class StartPageApp {
     // Color Theme Functions
     async loadAndApplyColorTheme() {
         try {
-            const colorTheme = await StorageManager.loadColorTheme();
-            this.applyColorTheme(colorTheme);
+            this.colorTheme = await StorageManager.loadColorTheme();
+            this.applyColorTheme(this.colorTheme);
         } catch (error) {
             console.error('Error loading color theme:', error);
         }
@@ -530,8 +539,8 @@ class StartPageApp {
     // Font Settings Functions
     async loadAndApplyFontSettings() {
         try {
-            const fontSettings = await StorageManager.loadFontSettings();
-            this.applyFontSettings(fontSettings);
+            this.fontSettings = await StorageManager.loadFontSettings();
+            this.applyFontSettings(this.fontSettings);
         } catch (error) {
             console.error('Error loading font settings:', error);
         }
@@ -545,6 +554,19 @@ class StartPageApp {
         document.documentElement.style.setProperty('--url-item-font-family', fontSettings.urlItem.family);
         document.documentElement.style.setProperty('--url-item-font-size', fontSettings.urlItem.size);
         document.documentElement.style.setProperty('--url-item-font-color', fontSettings.urlItem.color);
+    }
+
+    // Display version number from manifest
+    displayVersion() {
+        try {
+            const manifest = chrome.runtime.getManifest();
+            const versionElement = document.getElementById('startpageVersion');
+            if (versionElement && manifest.version) {
+                versionElement.textContent = `v${manifest.version}`;
+            }
+        } catch (error) {
+            console.error('Error displaying version:', error);
+        }
     }
 }
 
