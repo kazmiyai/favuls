@@ -43,7 +43,7 @@ A Chrome extension for bookmark management with local db sync(chrome.storage.syn
 - **Permissions Required**:
   - `activeTab` - Access current tab information
   - `storage` - Local data storage
-  - `host_permissions` - Access to Google Favicon API for favicon fetching
+  - `favicon` - Access to Chrome's favicon API for fetching website icons
 
 ### 2.2 Local Database
 - **Storage API**: Chrome Extension Storage API
@@ -117,9 +117,12 @@ A Chrome extension for bookmark management with local db sync(chrome.storage.syn
   - Responsive design for different screen sizes
 - **Favicon**:
   - Fetched dynamically when URL is displayed in UI
-  - Uses Google Favicon API: `https://www.google.com/s2/favicons?domain={domain}&sz=16`
-  - Fallback to default bookmark icon if network request fails
-  - No local storage - retrieved fresh on each display
+  - Uses Chrome's official Manifest V3 Favicon API: `chrome-extension://[EXTENSION_ID]/_favicon/?pageUrl={url}&size=16`
+  - Shows exact same favicons as browser tabs using Chrome's internal cache
+  - Works with all domains including subdomains (e.g., tsp-pj.backlog.com)
+  - Fallback to default bookmark icon if favicon unavailable
+  - No external API dependency - works offline
+  - No local storage - retrieved from Chrome's favicon cache on each display
 - **Error Handling**:
   - Toast notifications for non-critical errors
   - Modal dialogs for critical errors requiring user action
