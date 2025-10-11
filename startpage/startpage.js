@@ -381,6 +381,9 @@ class StartPageApp {
             bookmarkFavicon.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjVGNUY1IiByeD0iMiIvPgo8cGF0aCBkPSJNNCA2SDE0VjEwSDRWNloiIGZpbGw9IiNEREREREQiLz4KPHBhdGggZD0iTTYgOEgxMlY5SDZWOFoiIGZpbGw9IiNCQkJCQkIiLz4KPC9zdmc+';
         });
 
+        // Asynchronously fetch and update with direct favicon from website
+        FavURLUtils.updateFaviconAsync(bookmarkFavicon, url.url);
+
         // Add drag-and-drop event listeners for bookmark reordering and group assignment
         bookmarkItem.addEventListener('dragstart', (e) => {
             this.dragDropManager.handleURLDragStart(e, url);

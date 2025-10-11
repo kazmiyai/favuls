@@ -5,10 +5,8 @@
   "description": "A Chrome extension for bookmark management with local sync",
   "permissions": [
     "activeTab",
-    "storage"
-  ],
-  "host_permissions": [
-    "https://www.google.com/*"
+    "storage",
+    "favicon"
   ],
   "action": {
     "default_popup": "popup/popup.html",

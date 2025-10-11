@@ -23,12 +23,74 @@ function extractDomain(url) {
 }
 
 /**
- * Generates a favicon URL for a given domain
- * @param {string} domain - The domain to get favicon for
- * @returns {string} Google Favicon API URL
+ * Generates a favicon URL using Chrome's Manifest V3 favicon API
+ * @param {string} urlOrDomain - The full URL or domain to get favicon for
+ * @returns {string} Chrome extension favicon URL
  */
-function generateFaviconUrl(domain) {
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+function generateFaviconUrl(urlOrDomain) {
+    // Ensure we have a full URL
+    const pageUrl = urlOrDomain.startsWith('http') ? urlOrDomain : `https://${urlOrDomain}`;
+
+    // Use Chrome's official Manifest V3 favicon API
+    // Format: chrome-extension://EXTENSION_ID/_favicon/?pageUrl=URL&size=SIZE
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+        const faviconUrl = new URL(chrome.runtime.getURL("/_favicon/"));
+        faviconUrl.searchParams.set("pageUrl", pageUrl);
+        faviconUrl.searchParams.set("size", "16");
+        return faviconUrl.toString();
+    }
+
+    // Fallback for contexts where chrome.runtime is not available
+    // This shouldn't happen in normal extension contexts, but provides safety
+    return `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZjBmMGYwIi8+CjxwYXRoIGQ9Ik0zIDRoMTB2OEgzeiIgZmlsbD0iIzk5OSIvPgo8L3N2Zz4=`;
+}
+
+/**
+ * Asynchronously fetches the direct favicon from a website's /favicon.ico
+ * @param {string} url - The full URL of the website
+ * @returns {Promise<string|null>} The favicon URL if found, null otherwise
+ */
+async function fetchDirectFavicon(url) {
+    try {
+        // Parse the URL to get the base domain
+        const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+        const faviconUrl = `${urlObj.protocol}//${urlObj.host}/favicon.ico`;
+
+        // Try to fetch the favicon with a HEAD request to check if it exists
+        const response = await fetch(faviconUrl, {
+            method: 'HEAD',
+            mode: 'no-cors', // Avoid CORS issues
+            cache: 'no-cache'
+        });
+
+        // For no-cors mode, we can't check response.ok, so we just return the URL
+        // The browser will handle loading it, and if it fails, the onerror handler will catch it
+        return faviconUrl;
+    } catch (error) {
+        console.debug('Failed to fetch direct favicon:', error);
+        return null;
+    }
+}
+
+/**
+ * Attempts to update an image element's favicon by trying direct fetch
+ * @param {HTMLImageElement} imgElement - The image element to update
+ * @param {string} url - The URL to fetch favicon for
+ */
+async function updateFaviconAsync(imgElement, url) {
+    const directFavicon = await fetchDirectFavicon(url);
+    if (directFavicon && imgElement) {
+        // Store the original src as fallback
+        const originalSrc = imgElement.src;
+
+        // Try to load the direct favicon
+        imgElement.src = directFavicon;
+
+        // If direct favicon fails to load, revert to original
+        imgElement.onerror = () => {
+            imgElement.src = originalSrc;
+        };
+    }
 }
 
 /**
@@ -130,6 +192,8 @@ if (typeof module !== 'undefined' && module.exports) {
         generateUniqueId,
         extractDomain,
         generateFaviconUrl,
+        fetchDirectFavicon,
+        updateFaviconAsync,
         escapeHtml,
         isValidURL,
         getURLStorageKey,
@@ -142,6 +206,8 @@ if (typeof module !== 'undefined' && module.exports) {
         generateUniqueId,
         extractDomain,
         generateFaviconUrl,
+        fetchDirectFavicon,
+        updateFaviconAsync,
         escapeHtml,
         isValidURL,
         getURLStorageKey,

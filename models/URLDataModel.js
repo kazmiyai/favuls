@@ -10,7 +10,7 @@ class URLDataModel {
         this.created = data.created || new Date().toISOString();
         this.lastModified = data.lastModified || new Date().toISOString();
         this.domain = data.domain || FavURLUtils.extractDomain(this.url);
-        this.favicon = data.favicon || FavURLUtils.generateFaviconUrl(this.domain);
+        this.favicon = data.favicon || FavURLUtils.generateFaviconUrl(this.url);
         this.tags = data.tags || [];
         this.order = data.order !== undefined ? data.order : Date.now(); // Use timestamp as default order
         this.isValidated = false;

@@ -766,9 +766,9 @@ class BookmarkManager {
         urlElement.setAttribute('data-group-id', urlData.groupId);
 
         // Task 2.4: Simple list display with URL and title
-        // Get domain for favicon
+        // Use Chrome's favicon service with full URL for better quality
+        const faviconUrl = FavURLUtils.generateFaviconUrl(urlData.url);
         const domain = this.extractDomain(urlData.url);
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
 
         // Create simplified display for Task 2.4 requirements
         urlElement.innerHTML = `
@@ -790,6 +790,12 @@ class BookmarkManager {
                 </button>
             </div>
         `;
+
+        // Asynchronously fetch and update with direct favicon from website
+        const faviconImg = urlElement.querySelector('.url-favicon');
+        if (faviconImg) {
+            FavURLUtils.updateFaviconAsync(faviconImg, urlData.url);
+        }
 
         // Add click handler for opening URL
         urlElement.addEventListener('click', (e) => {
@@ -1675,7 +1681,7 @@ class BookmarkManager {
 
             // Update domain and favicon if URL changed
             existingURL.domain = FavURLUtils.extractDomain(url);
-            existingURL.favicon = FavURLUtils.generateFaviconUrl(existingURL.domain);
+            existingURL.favicon = FavURLUtils.generateFaviconUrl(url);
 
             // Validate the updated URL
             const validation = existingURL.validate();
