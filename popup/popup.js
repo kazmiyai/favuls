@@ -19,6 +19,8 @@ class BookmarkManager {
         // Start page toggle state
         this.startPageEnabled = true; // Default to enabled
         this.openInNewTab = true; // Default to opening in new tab
+        // Color theme state
+        this.colorTheme = null; // Will be loaded from storage
         this.init();
     }
 
@@ -29,6 +31,7 @@ class BookmarkManager {
         await this.loadData();
         await this.loadGroupExpandedState();
         await this.updateStorageQuota();
+        await this.loadAndApplyColorTheme();
 
         this.setupEventListeners();
         this.initializeToggle();
@@ -86,6 +89,7 @@ class BookmarkManager {
             // Load metadata
             this.startPageEnabled = data.metadata.startPageEnabled;
             this.openInNewTab = data.metadata.openInNewTab;
+            this.colorTheme = data.metadata.colorTheme;
 
             // Check for data model version compatibility
             if (data.metadata.dataModelVersion && data.metadata.dataModelVersion !== this.dataModelVersion) {
@@ -128,7 +132,8 @@ class BookmarkManager {
                 version: '1.0',
                 dataModelVersion: this.dataModelVersion,
                 startPageEnabled: this.startPageEnabled,
-                openInNewTab: this.openInNewTab
+                openInNewTab: this.openInNewTab,
+                colorTheme: this.colorTheme
             };
 
             // Use StorageManager to save data
@@ -233,6 +238,15 @@ class BookmarkManager {
             importDataBtn.addEventListener('click', () => {
                 this.closeMenu();
                 this.importData();
+            });
+        }
+
+        // Color settings button
+        const colorSettingsBtn = document.getElementById('colorSettings');
+        if (colorSettingsBtn) {
+            colorSettingsBtn.addEventListener('click', () => {
+                this.closeMenu();
+                this.openColorSettingsModal();
             });
         }
 
@@ -3331,6 +3345,207 @@ class BookmarkManager {
         });
 
         return Array.from(urlMap.values());
+    }
+
+    // Color Settings Modal Functions
+    async openColorSettingsModal() {
+        try {
+            // Load current color theme
+            const colorTheme = await StorageManager.loadColorTheme();
+
+            // Get templates
+            const template = document.getElementById('colorSettingsModalTemplate');
+            const footerTemplate = document.getElementById('colorSettingsModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Color settings templates not found');
+                this.showToast('Color settings unavailable');
+                return;
+            }
+
+            // Clone template content
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Set current color values
+            const pageColorInput = modalBody.getElementById('pageBackgroundColor');
+            const pageColorHexInput = modalBody.getElementById('pageBackgroundColorHex');
+            const groupColorInput = modalBody.getElementById('groupHeaderBackgroundColor');
+            const groupColorHexInput = modalBody.getElementById('groupHeaderBackgroundColorHex');
+            const urlColorInput = modalBody.getElementById('urlItemBackgroundColor');
+            const urlColorHexInput = modalBody.getElementById('urlItemBackgroundColorHex');
+
+            if (pageColorInput && pageColorHexInput) {
+                pageColorInput.value = colorTheme.pageBackground;
+                pageColorHexInput.value = colorTheme.pageBackground;
+            }
+            if (groupColorInput && groupColorHexInput) {
+                groupColorInput.value = colorTheme.groupHeaderBackground;
+                groupColorHexInput.value = colorTheme.groupHeaderBackground;
+            }
+            if (urlColorInput && urlColorHexInput) {
+                urlColorInput.value = colorTheme.urlItemBackground;
+                urlColorHexInput.value = colorTheme.urlItemBackground;
+            }
+
+            // Open modal
+            this.openModal('Color Settings', modalBody, modalFooter);
+
+            // Setup event listeners after modal is opened
+            setTimeout(() => {
+                this.setupColorSettingsListeners();
+            }, 100);
+
+        } catch (error) {
+            console.error('Error opening color settings modal:', error);
+            this.showToast('Failed to open color settings');
+        }
+    }
+
+    setupColorSettingsListeners() {
+        // Color picker and hex input sync
+        const syncColorInputs = (colorInput, hexInput) => {
+            if (!colorInput || !hexInput) return;
+
+            colorInput.addEventListener('input', (e) => {
+                hexInput.value = e.target.value.toUpperCase();
+            });
+
+            hexInput.addEventListener('input', (e) => {
+                const value = e.target.value;
+                if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                    colorInput.value = value;
+                }
+            });
+        };
+
+        syncColorInputs(
+            document.getElementById('pageBackgroundColor'),
+            document.getElementById('pageBackgroundColorHex')
+        );
+        syncColorInputs(
+            document.getElementById('groupHeaderBackgroundColor'),
+            document.getElementById('groupHeaderBackgroundColorHex')
+        );
+        syncColorInputs(
+            document.getElementById('urlItemBackgroundColor'),
+            document.getElementById('urlItemBackgroundColorHex')
+        );
+
+        // Save button
+        const form = document.getElementById('colorSettingsForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.saveColorSettings();
+            });
+        }
+
+        // Cancel button
+        const cancelBtn = document.getElementById('cancelColorSettings');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.closeModal();
+            });
+        }
+
+        // Reset button
+        const resetBtn = document.getElementById('resetColorTheme');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', async () => {
+                await this.resetColorSettings();
+            });
+        }
+    }
+
+    async saveColorSettings() {
+        try {
+            const pageColor = document.getElementById('pageBackgroundColorHex')?.value;
+            const groupColor = document.getElementById('groupHeaderBackgroundColorHex')?.value;
+            const urlColor = document.getElementById('urlItemBackgroundColorHex')?.value;
+
+            // Validate color format
+            const colorPattern = /^#[0-9A-Fa-f]{6}$/;
+            if (!colorPattern.test(pageColor) || !colorPattern.test(groupColor) || !colorPattern.test(urlColor)) {
+                this.showToast('Invalid color format. Please use hex format (#RRGGBB)');
+                return;
+            }
+
+            const colorTheme = {
+                pageBackground: pageColor,
+                groupHeaderBackground: groupColor,
+                urlItemBackground: urlColor
+            };
+
+            // Update instance variable so it's preserved in saveData()
+            this.colorTheme = colorTheme;
+
+            await StorageManager.saveColorTheme(colorTheme);
+
+            // Apply colors immediately to popup
+            this.applyColorTheme(colorTheme);
+
+            this.closeModal();
+            this.showToast('Color settings saved successfully');
+
+        } catch (error) {
+            console.error('Error saving color settings:', error);
+            this.showToast('Failed to save color settings');
+        }
+    }
+
+    async resetColorSettings() {
+        try {
+            await StorageManager.resetColorTheme();
+
+            // Get default colors and update inputs
+            const defaultTheme = StorageManager.getDefaultColorTheme();
+
+            // Update instance variable so it's preserved in saveData()
+            this.colorTheme = defaultTheme;
+
+            const pageColorInput = document.getElementById('pageBackgroundColor');
+            const pageColorHexInput = document.getElementById('pageBackgroundColorHex');
+            const groupColorInput = document.getElementById('groupHeaderBackgroundColor');
+            const groupColorHexInput = document.getElementById('groupHeaderBackgroundColorHex');
+            const urlColorInput = document.getElementById('urlItemBackgroundColor');
+            const urlColorHexInput = document.getElementById('urlItemBackgroundColorHex');
+
+            if (pageColorInput && pageColorHexInput) {
+                pageColorInput.value = defaultTheme.pageBackground;
+                pageColorHexInput.value = defaultTheme.pageBackground;
+            }
+            if (groupColorInput && groupColorHexInput) {
+                groupColorInput.value = defaultTheme.groupHeaderBackground;
+                groupColorHexInput.value = defaultTheme.groupHeaderBackground;
+            }
+            if (urlColorInput && urlColorHexInput) {
+                urlColorInput.value = defaultTheme.urlItemBackground;
+                urlColorHexInput.value = defaultTheme.urlItemBackground;
+            }
+
+            this.showToast('Colors reset to defaults');
+
+        } catch (error) {
+            console.error('Error resetting colors:', error);
+            this.showToast('Failed to reset colors');
+        }
+    }
+
+    applyColorTheme(colorTheme) {
+        // Apply colors to popup using CSS custom properties
+        document.documentElement.style.setProperty('--page-bg', colorTheme.pageBackground);
+        document.documentElement.style.setProperty('--group-header-bg', colorTheme.groupHeaderBackground);
+        document.documentElement.style.setProperty('--url-item-bg', colorTheme.urlItemBackground);
+    }
+
+    async loadAndApplyColorTheme() {
+        try {
+            const colorTheme = await StorageManager.loadColorTheme();
+            this.applyColorTheme(colorTheme);
+        } catch (error) {
+            console.error('Error loading color theme:', error);
+        }
     }
 }
 

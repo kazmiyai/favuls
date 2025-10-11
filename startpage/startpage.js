@@ -45,6 +45,9 @@ class StartPageApp {
                 this.collapsedGroups = new Set(JSON.parse(collapsedData));
             }
 
+            // Load and apply color theme
+            await this.loadAndApplyColorTheme();
+
             // Set up event listeners
             this.setupEventListeners();
 
@@ -503,6 +506,23 @@ class StartPageApp {
             throw error;
         }
     }
+
+    // Color Theme Functions
+    async loadAndApplyColorTheme() {
+        try {
+            const colorTheme = await StorageManager.loadColorTheme();
+            this.applyColorTheme(colorTheme);
+        } catch (error) {
+            console.error('Error loading color theme:', error);
+        }
+    }
+
+    applyColorTheme(colorTheme) {
+        // Apply colors to startpage using CSS custom properties
+        document.documentElement.style.setProperty('--page-bg', colorTheme.pageBackground);
+        document.documentElement.style.setProperty('--group-header-bg', colorTheme.groupHeaderBackground);
+        document.documentElement.style.setProperty('--url-item-bg', colorTheme.urlItemBackground);
+    }
 }
 
 // Initialize the start page when DOM is loaded
@@ -527,6 +547,12 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
         if (namespace === 'sync') {
             // If start page toggle or open new tab toggle changed, reload the page immediately
             if (changes.startPageEnabled || changes.openInNewTab) {
+                window.location.reload();
+                return;
+            }
+
+            // If color theme changed, reload the page to apply new colors
+            if (changes.colorTheme) {
                 window.location.reload();
                 return;
             }

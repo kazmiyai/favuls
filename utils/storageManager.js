@@ -36,6 +36,7 @@ function generateAllStorageKeys() {
         'dataModelVersion',
         'startPageEnabled',
         'openInNewTab',
+        'colorTheme',  // Color customization
         'urls',      // Legacy format
         'groups',    // Legacy format
         ...generateGroupKeys(),
@@ -61,6 +62,7 @@ async function loadDataFromStorage() {
                 dataModelVersion: result.dataModelVersion,
                 startPageEnabled: result.startPageEnabled !== undefined ? result.startPageEnabled : true,
                 openInNewTab: result.openInNewTab !== undefined ? result.openInNewTab : true,
+                colorTheme: result.colorTheme || getDefaultColorTheme(),
                 version: result.version,
                 lastUpdated: result.lastUpdated
             }
@@ -122,7 +124,8 @@ async function saveDataToStorage(groups, urls, metadata = {}) {
             version: metadata.version || '1.0',
             dataModelVersion: metadata.dataModelVersion || '1.0',
             startPageEnabled: metadata.startPageEnabled !== undefined ? metadata.startPageEnabled : true,
-            openInNewTab: metadata.openInNewTab !== undefined ? metadata.openInNewTab : true
+            openInNewTab: metadata.openInNewTab !== undefined ? metadata.openInNewTab : true,
+            colorTheme: metadata.colorTheme || getDefaultColorTheme()
         };
 
         // Convert data models to JSON if needed
@@ -242,6 +245,68 @@ async function removeStorageKeys(keys) {
     }
 }
 
+/**
+ * Gets the default color theme
+ * @returns {Object} Default color theme object
+ */
+function getDefaultColorTheme() {
+    return {
+        pageBackground: '#f5f5f5',
+        groupHeaderBackground: '#fafafa',
+        urlItemBackground: '#ffffff'
+    };
+}
+
+/**
+ * Loads the color theme from storage
+ * @returns {Promise<Object>} Color theme object
+ */
+async function loadColorTheme() {
+    try {
+        const result = await chrome.storage.sync.get('colorTheme');
+        return result.colorTheme || getDefaultColorTheme();
+    } catch (error) {
+        console.error('Error loading color theme:', error);
+        return getDefaultColorTheme();
+    }
+}
+
+/**
+ * Saves the color theme to storage
+ * @param {Object} colorTheme - Color theme object with pageBackground, groupHeaderBackground, urlItemBackground
+ * @returns {Promise<void>}
+ */
+async function saveColorTheme(colorTheme) {
+    try {
+        // Validate color theme structure
+        const validatedTheme = {
+            pageBackground: colorTheme.pageBackground || getDefaultColorTheme().pageBackground,
+            groupHeaderBackground: colorTheme.groupHeaderBackground || getDefaultColorTheme().groupHeaderBackground,
+            urlItemBackground: colorTheme.urlItemBackground || getDefaultColorTheme().urlItemBackground
+        };
+
+        await chrome.storage.sync.set({ colorTheme: validatedTheme });
+        console.log('Color theme saved successfully');
+    } catch (error) {
+        console.error('Error saving color theme:', error);
+        throw error;
+    }
+}
+
+/**
+ * Resets the color theme to defaults
+ * @returns {Promise<void>}
+ */
+async function resetColorTheme() {
+    try {
+        await saveColorTheme(getDefaultColorTheme());
+        console.log('Color theme reset to defaults');
+    } catch (error) {
+        console.error('Error resetting color theme:', error);
+        throw error;
+    }
+}
+
 // Export functions for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     // Node.js environment
@@ -253,7 +318,11 @@ if (typeof module !== 'undefined' && module.exports) {
         saveDataToStorage,
         getStorageUsage,
         clearAllStorage,
-        removeStorageKeys
+        removeStorageKeys,
+        getDefaultColorTheme,
+        loadColorTheme,
+        saveColorTheme,
+        resetColorTheme
     };
 } else if (typeof self !== 'undefined') {
     // Service Worker or Web Worker environment - attach to self (global scope)
@@ -265,7 +334,11 @@ if (typeof module !== 'undefined' && module.exports) {
         saveDataToStorage,
         getStorageUsage,
         clearAllStorage,
-        removeStorageKeys
+        removeStorageKeys,
+        getDefaultColorTheme,
+        loadColorTheme,
+        saveColorTheme,
+        resetColorTheme
     };
 } else if (typeof window !== 'undefined') {
     // Browser environment - attach to window
@@ -277,6 +350,10 @@ if (typeof module !== 'undefined' && module.exports) {
         saveDataToStorage,
         getStorageUsage,
         clearAllStorage,
-        removeStorageKeys
+        removeStorageKeys,
+        getDefaultColorTheme,
+        loadColorTheme,
+        saveColorTheme,
+        resetColorTheme
     };
 }

@@ -51,6 +51,10 @@
                             <span class="menu-item-icon">⬆</span>
                             <span class="menu-item-text">Import Data</span>
                         </button>
+                        <button class="menu-item" id="colorSettings" role="menuitem">
+                            <span class="menu-item-icon">🎨</span>
+                            <span class="menu-item-text">Color...</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -352,6 +356,81 @@
     <template id="importConfirmationModalFooterTemplate">
         <button type="button" class="btn btn-secondary" id="cancelImport">Cancel</button>
         <button type="submit" class="btn btn-primary" form="importConfirmationForm" id="confirmImport">Import Data</button>
+    </template>
+
+    <!-- Color Settings Modal Template (hidden) -->
+    <template id="colorSettingsModalTemplate">
+        <form class="color-settings-form" id="colorSettingsForm">
+            <div class="form-group">
+                <label class="form-label" for="pageBackgroundColor">Start Page Background Color</label>
+                <div class="color-picker-container">
+                    <input type="color"
+                           class="form-color-input"
+                           id="pageBackgroundColor"
+                           name="pageBackgroundColor"
+                           value="#f5f5f5"
+                           aria-label="Choose page background color">
+                    <input type="text"
+                           class="form-input color-hex-input"
+                           id="pageBackgroundColorHex"
+                           name="pageBackgroundColorHex"
+                           value="#f5f5f5"
+                           pattern="^#[0-9A-Fa-f]{6}$"
+                           maxlength="7"
+                           placeholder="#f5f5f5">
+                </div>
+                <div class="form-help">Background color for the start page</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="groupHeaderBackgroundColor">Group Title Background Color</label>
+                <div class="color-picker-container">
+                    <input type="color"
+                           class="form-color-input"
+                           id="groupHeaderBackgroundColor"
+                           name="groupHeaderBackgroundColor"
+                           value="#fafafa"
+                           aria-label="Choose group header background color">
+                    <input type="text"
+                           class="form-input color-hex-input"
+                           id="groupHeaderBackgroundColorHex"
+                           name="groupHeaderBackgroundColorHex"
+                           value="#fafafa"
+                           pattern="^#[0-9A-Fa-f]{6}$"
+                           maxlength="7"
+                           placeholder="#fafafa">
+                </div>
+                <div class="form-help">Background color for group headers (popup & start page)</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="urlItemBackgroundColor">URL Item Background Color</label>
+                <div class="color-picker-container">
+                    <input type="color"
+                           class="form-color-input"
+                           id="urlItemBackgroundColor"
+                           name="urlItemBackgroundColor"
+                           value="#ffffff"
+                           aria-label="Choose URL item background color">
+                    <input type="text"
+                           class="form-input color-hex-input"
+                           id="urlItemBackgroundColorHex"
+                           name="urlItemBackgroundColorHex"
+                           value="#ffffff"
+                           pattern="^#[0-9A-Fa-f]{6}$"
+                           maxlength="7"
+                           placeholder="#ffffff">
+                </div>
+                <div class="form-help">Background color for URL items</div>
+            </div>
+        </form>
+    </template>
+
+    <!-- Color Settings Modal Footer Template (hidden) -->
+    <template id="colorSettingsModalFooterTemplate">
+        <button type="button" class="btn btn-secondary" id="resetColorTheme">Reset to Defaults</button>
+        <button type="button" class="btn btn-secondary" id="cancelColorSettings">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="colorSettingsForm" id="saveColorSettings">Save Colors</button>
     </template>
 
     <!-- Loading Spinner (placeholder for future implementation) -->
