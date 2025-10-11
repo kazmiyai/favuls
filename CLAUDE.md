@@ -1,252 +1,174 @@
-# Chrome Extension Requirements Document
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-A Chrome extension for bookmark management with local db sync(chrome.storage.sync).
 
-## 1. Functional Requirements
+FavURL is a Chrome Manifest V3 extension for bookmark management with local sync via `chrome.storage.sync`. It features URL grouping, drag-and-drop organization, import/export, and a customizable start page.
 
-### 1.1 Core Functionality
-- **URL Storage**: When user clicks the extension icon, capture and store the current active tab's URL
-- **Local Database**: Store URLs locally using Chrome's storage API of chrome.storage.sync
-- **Export/Import Database**: Functions to export/import local database as JSON formatted file
-- **URL Grouping**: Allow users to organize URLs into custom-named groups
-- **Edit Database**: user can edit the database, like deleteing, adding, editing.
+## Architecture
 
-### 1.2 URL Management
-- **Capture**: 
-  - One-click on the icon to capture URL from current tab
-  - default catgegory group is "Ungrouped" category.
-- **Storage**:
-  - Store URL, title, timestamp, and groupId.
-  - Data stored in chrome.storage.sync with keys: "urls" and "groups"
-  - Default "Ungrouped" group with id: "ungrouped" created automatically
-- **Grouping**:
-  - Create new groups with custom names (max 50 groups)
-  - Assign URLs to existing groups via drag & drop or dropdown
-  - Default "Ungrouped" category for unassigned URLs
-  - Group deletion: URLs moved to "Ungrouped" when group is deleted
-  - Group reordering: Drag & drop to reorder groups in UI
-- **Display**: Show saved URLs organized by groups
+### Core Components
 
-### 1.3 Data Synchronization
-- **Local-First**: Extension works offline with local storage
-- **Automatic Sync**: Sync data when internet connection is available by using chrome.storage.sync
-- **Conflict Resolution**: 
-  - Handle conflicts between synced devices. 
-  - if the record's "id" is same and title or metadata is updated, lookup the timestamp and update the record which has newer timestamp.
+**Storage Layer** ([utils/storageManager.js](utils/storageManager.js))
+- Centralized storage operations for all chrome.storage.sync interactions
+- **Chunked Storage Structure**: Uses 32 separate keys (`url000`-`url399`) to store up to 400 URLs, and 32 keys (`group00`-`group31`) for up to 32 groups
+- Handles automatic migration from legacy single-key format to chunked format
+- Key functions: `loadDataFromStorage()`, `saveDataToStorage()`, `loadColorTheme()`, `saveFontSettings()`
+- Storage limits: 100KB total, 8KB per item
 
-## 2. Technical Requirements
+**Data Models**
+- [URLDataModel](models/URLDataModel.js): Manages URL data with validation, domain extraction, and favicon generation
+- [GroupDataModel](models/GroupDataModel.js): Manages group data with validation and ordering
+- Both models provide `toJSON()` for serialization and `fromJSON()` for deserialization
 
-### 2.1 Chrome Extension Architecture
-- **Manifest Version**: 3
-- **Extension Type**: Browser Action extension
-- **Permissions Required**:
-  - `activeTab` - Access current tab information
-  - `storage` - Local data storage
-  - `favicon` - Access to Chrome's favicon API for fetching website icons
+**Main UI Components**
+- [popup/popup.js](popup/popup.js): Extension popup (400x600px) - BookmarkManager class handles all UI interactions, URL management, import/export, and settings
+- [startpage/startpage.js](startpage/startpage.js): New tab override page - StartPageApp class renders bookmarks with collapsible groups
+- Both share utility functions from [utils/shared.js](utils/shared.js)
 
-### 2.2 Local Database
-- **Storage API**: Chrome Extension Storage API
-- **Storage Type**: `chrome.storage.sync`.
-- **Enhanced 32-Key Storage Structure**:
-  ```json
-  {
-    "urls0": [
-      {
-        "id": "unique_id",
-        "url": "https://example.com",
-        "title": "Page Title",
-        "timestamp": "ISO_timestamp",
-        "groupId": "ungrouped"
-      }
-    ],
-    "urls1": [
-      {
-        "id": "unique_id2",
-        "url": "https://work.example.com",
-        "title": "Work Page",
-        "timestamp": "ISO_timestamp",
-        "groupId": "group_id_1"
-      }
-    ],
-    "urls2": "... additional URL groups ...",
-    "...": "urls3 through urls31",
-    "groups": [
-      {
-        "id": "group_id",
-        "name": "Group Name",
-        "created": "ISO_timestamp"
-      }
-    ]
-  }
+### Data Flow
+
+1. **URL Capture**: User clicks extension → `captureCurrentTab()` in BookmarkManager → saves via StorageManager
+2. **Data Persistence**: BookmarkManager maintains in-memory state (`this.urls`, `this.groups`) → `saveData()` writes to storage via StorageManager → automatic sync across devices
+3. **Start Page**: StartPageApp loads data via StorageManager → renders using templates → listens for storage changes
+
+### Storage Schema
+
+**Metadata Keys** (stored directly in chrome.storage.sync):
+- `groupCount`, `urlCount`: Track item counts
+- `dataModelVersion`: Schema version for migrations
+- `startPageEnabled`, `openInNewTab`: User preferences
+- `colorTheme`: Background colors for page, group headers, URL items
+- `fontSettings`: Font family, size, color for group titles and URL items
+
+**Chunked Storage**:
+- `url000`-`url399`: Individual URL objects (max 400)
+- `group00`-`group31`: Individual group objects (max 32)
+- `group00` is always the "Ungrouped" group (id: "ungrouped")
+
+### Critical State Management
+
+**BookmarkManager Class** ([popup/popup.js](popup/popup.js))
+- IMPORTANT: Always include `colorTheme` and `fontSettings` in `saveData()` metadata to prevent reset to defaults
+- Pattern:
+  ```javascript
+  const metadata = {
+      version: '1.0',
+      dataModelVersion: this.dataModelVersion,
+      startPageEnabled: this.startPageEnabled,
+      openInNewTab: this.openInNewTab,
+      colorTheme: this.colorTheme,        // Must include
+      fontSettings: this.fontSettings     // Must include
+  };
   ```
-- **Storage Organization**:
-  - URLs distributed across 32 separate keys: `urls0` through `urls31`
-  - `urls0` always contains "Ungrouped" URLs
-  - `urls1` through `urls31` contain URLs for specific groups
-  - Groups stored in single `groups` key for metadata
-- **Storage Limits**:
-  - chrome.storage.sync total limit: 100KB
-  - Per-item limit: 8KB (each `urlsX` key respects this limit)
-  - Better distribution allows for larger total collections
-- **Default Group**: "Ungrouped" group (id: "ungrouped") automatically created, always uses `urls0`
-- **Migration**: Automatic migration from legacy single `urls` key to new 32-key structure
 
-## 3. Non-Functional Requirements
+**Group Management**:
+- Default "Ungrouped" group (id: "ungrouped") is protected and cannot be deleted
+- When a group is deleted, all its URLs are moved to "Ungrouped"
+- Groups are reorderable via drag-and-drop, tracked by `order` property
 
-### 3.1 Performance
-- **Response Time**: < 200ms for URL capture
-- **Storage Limits**: Respect Chrome storage quotas
-- **Sync Efficiency**: Incremental sync to minimize bandwidth
+**URL Management**:
+- URLs stored with `order` property for custom sorting
+- Favicons use Chrome's Manifest V3 API: `chrome-extension://[ID]/_favicon/?pageUrl={url}&size=16`
+- Favicon fallback: Direct fetch from `/favicon.ico`, then default SVG icon
 
-### 3.2 Security
-- **Data Encryption**: All data encrypted in transit
-- **Privacy**: No tracking or analytics without user consent
+### Import/Export
 
-### 3.3 Usability
-- **One-Click Save**: Primary action accessible with single click
-- **Popup window**:
-  - Dimensions: 400px width × 600px height
-  - Add URL modal: URL and title input fields with group selection dropdown
-  - Edit URL modal: URL, title, and group fields with delete button
-  - Loading states: Spinner with descriptive text during operations
-- **Open tab with URL**: Opens new tab with selected URL on click
-- **Intuitive UI**:
-  - Clear visual hierarchy and navigation
-  - Modern graphical interface for business use
-  - Responsive design for different screen sizes
-- **Favicon**:
-  - Fetched dynamically when URL is displayed in UI
-  - Uses Chrome's official Manifest V3 Favicon API: `chrome-extension://[EXTENSION_ID]/_favicon/?pageUrl={url}&size=16`
-  - Shows exact same favicons as browser tabs using Chrome's internal cache
-  - Works with all domains including subdomains (e.g., tsp-pj.backlog.com)
-  - Fallback to default bookmark icon if favicon unavailable
-  - No external API dependency - works offline
-  - No local storage - retrieved from Chrome's favicon cache on each display
-- **Error Handling**:
-  - Toast notifications for non-critical errors
-  - Modal dialogs for critical errors requiring user action
-  - Inline validation messages for form inputs
-  - Network error handling with retry options
+**Export** ([popup/popup.js](popup/popup.js) - `exportData()`):
+- Reads all chunked storage keys
+- Consolidates into single JSON with metadata
+- Filename format: `favurl-backup-YYYY-MM-DDTHH-MM-SS.json`
 
-### 3.4 Reliability
-- **Offline Support**: Core functionality available without internet
-- **Data Integrity**: Prevent data loss during sync failures
-- **Error Recovery**: Automatic retry mechanisms for failed operations
+**Import** ([popup/popup.js](popup/popup.js) - `handleImportFile()`):
+- Validates JSON structure via `validateImportData()`
+- Shows confirmation modal with merge/replace options
+- Duplicate detection: Compares URL + title, uses timestamp for conflict resolution
 
-### 3.5 Accessibility
-- **Keyboard Navigation**:
-  - Tab navigation through all interactive elements
-  - Enter/Space to activate buttons and links
-  - Escape key to close modals and cancel operations
-  - Arrow keys for navigating lists
-- **Screen Reader Support**:
-  - ARIA labels for all interactive elements
-  - ARIA roles for dynamic content regions
-  - Live regions for status updates and notifications
-  - Descriptive alt text for icons and images
-- **Focus Management**:
-  - Visible focus indicators on all interactive elements
-  - Logical focus order throughout the interface
-  - Focus trapping in modal dialogs
-  - Return focus to trigger element when modals close
-- **Color and Contrast**:
-  - WCAG 2.1 AA compliant color contrast ratios
-  - No reliance on color alone to convey information
-  - High contrast mode support
+### Customization Features
 
-## 4. User Stories
+**Color Theme** (accessible via popup menu → "Color..."):
+- Stored in `colorTheme` object with `pageBackground`, `groupHeaderBackground`, `urlItemBackground`
+- Applied via CSS custom properties: `--page-bg`, `--group-header-bg`, `--url-item-bg`
+- Changes auto-sync and reload start page
 
-### 4.1 URL Management
-- As a user, I want to save the current page URL with one click
-- As a user, I want to open a new tab with selected URL
-- As a user, I want to manually add URLs that I'm not currently visiting
-- As a user, I want to edit existing URLs to correct mistakes or update information
-- As a user, I want to edit the titles of my saved URLs for better organization
-- As a user, I want to move URLs between different groups
-- As a user, I want to delete URLs I no longer need
-- As a user, I want to organize my URLs into custom groups
-- As a user, I want to create new groups and name them appropriately
-- As a user, I want to view all my saved URLs organized by groups
+**Font Settings** (accessible via popup menu → "Font..."):
+- Stored in `fontSettings` object with `groupTitle` and `urlItem` sub-objects
+- Each has `family`, `size`, `color` properties
+- Applied via CSS custom properties on start page only
+- 9 font families available, size range 10-32px
 
-### 4.2 Group Management
-- As a user, I want to delete groups and have URLs moved to "Ungrouped"
-- As a user, I want to reorder groups to match my workflow
-- As a user, I want to be limited to a reasonable number of groups (50 max)
+### Drag & Drop
 
-### 4.3 Import/Export
-- As a user, I want to export my bookmarks as a JSON file for backup
-- As a user, I want to import bookmarks from a JSON file
-- As a user, I want duplicate URLs to be handled intelligently during import
+**Implementation** ([utils/dragDrop.js](utils/dragDrop.js)):
+- DragDropManager handles both URL reordering and group assignment
+- Context-aware: Detects 'popup' vs 'startpage' context
+- Visual feedback: Drop zones, drag handles, hover states
+- Persistence: Updates order properties and saves via StorageManager
 
-### 4.4 Search and Filtering
-- As a user, I want to search through my saved URLs by title or URL
-- As a user, I want to filter URLs by group
-- As a user, I want to see highlighted matching text in search results
+## Development Commands
 
-### 4.5 Accessibility
-- As a user with mobility impairments, I want to navigate the extension using only a keyboard
-- As a user with visual impairments, I want the extension to work with my screen reader
-- As a user with low vision, I want high contrast colors and clear focus indicators
+### Building for Chrome Web Store
 
-### 4.6 Synchronization
-- As a user, I want my bookmarks to sync across all my devices automatically
-- As a user, I want to access my bookmarks even when offline
+Update version in [manifest.json](manifest.json), then:
 
-## 5. Technical Implementation Details
-
-### 5.1 File Structure
-```
-/manifest.json
-/popup/
-  /popup.html
-  /popup.js
-  /popup.css
-/background/
-  /background.js
-/content/
-  /content.js (if needed)
+```bash
+zip -r favurl-extension.zip . -x "favurl-extension.zip" "*.git*" "node_modules/*" "*.DS_Store" "CLAUDE.md" "debug.md" "todo.md" "how_to_submit_chrome_web_store.txt" ".gitignore" "test-*" "test_*"
 ```
 
-### 5.2 Key APIs and Libraries
-- Chrome Extension APIs (storage, tabs, runtime)
-- HTML5 and modern JavaScript (ES6+)
+### Local Testing
 
-### 5.3 Data Flow
-1. User clicks extension icon
-2. Extension captures current tab URL and metadata
-3. Data stored locally immediately
-4. On other devices, changes are synced with chrome.storage.sync.
+1. Load unpacked extension:
+   - Navigate to `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select the project directory
 
-### 5.4 Start page
-1. As a user, I want to set the url of "chrome-extension://[extension_id]/startpage.html" as a startpage in the Chrome preference.
-2. As a user, I want to display the startpage when I open new browser window.
-3. The startpage will be constructed by the groups and urls, which is stored in the chrome.storage.sync.
+2. Test import scenarios using [test-import-scenarios.md](test-import-scenarios.md)
 
+## Key Patterns & Conventions
 
+**Modal Management** ([popup/popup.js](popup/popup.js)):
+- Use template cloning: `template.content.cloneNode(true)`
+- Pattern: `openModal(title, bodyTemplate, footerTemplate)` → setup listeners → `closeModal()`
+- Setup listeners in `setTimeout()` after modal opens to ensure DOM is ready
 
-### 1.4 Import/Export Functionality
-- **Export**: Download all data as JSON file with timestamp in filename
-- **Import**:
-  - Upload JSON file to import URLs and groups
-  - Duplicate detection: Compare URL + title, skip or update based on timestamp
-  - Error handling: Invalid JSON format, missing required fields
-  - Validation: Ensure imported data matches expected schema
-  - Merge strategy: Preserve existing data, add new items, update modified items
+**Storage Operations**:
+- Always use StorageManager methods, never direct chrome.storage.sync calls
+- Load: `const data = await StorageManager.loadDataFromStorage()` → access `data.metadata`, `data.groups`, `data.urls`
+- Save: `await StorageManager.saveDataToStorage(groups, urls, metadata)`
 
-### 1.5 Search and Filtering
-- **Search Scope**: Search within URL, title, and group names
-- **Search UI**: Search box at top of popup with real-time filtering
-- **Search Behavior**:
-  - Case-insensitive partial matching
-  - Highlight matching text in results
-  - Clear search button to reset filter
-  - No results message when no matches found
-- **Filtering**: Filter by group using dropdown or tabs
+**Error Handling**:
+- Toast notifications: `this.showToast(message)` for non-critical feedback
+- Error dialogs: `this.showError(message)` for critical errors
+- Validation: Data models provide `validate()` method
 
+**Accessibility**:
+- All interactive elements have ARIA labels
+- Modals use focus trapping
+- Keyboard navigation: Tab, Enter/Space, Escape, Arrow keys
+- Screen reader support via ARIA roles and live regions
 
+## Important Files
 
-## 6. Future Enhancements (Optional)
-- Bulk operations for multiple URLs
-- URL categorization by domain
-- Tag-based organization system
+- [manifest.json](manifest.json): Extension manifest, version must be updated for releases
+- [utils/storageManager.js](utils/storageManager.js): All storage operations, add new storage keys here
+- [popup/popup.js](popup/popup.js): Main extension logic, ~3800 lines
+- [startpage/startpage.js](startpage/startpage.js): Start page logic, renders bookmarks
+- [models/](models/): Data validation and structure
+
+## Extension Permissions
+
+- `activeTab`: Capture current tab URL
+- `storage`: chrome.storage.sync for bookmark data
+- `favicon`: Chrome's internal favicon API
+
+## Chrome Web Store Deployment
+
+See [how_to_submit_chrome_web_store.txt](how_to_submit_chrome_web_store.txt) for detailed submission instructions (in Japanese).
+
+Key requirements:
+- Version update in manifest.json
+- Privacy policy (no data collection, local storage only)
+- Screenshots: 1280x800px or 640x400px (1-5 images)
+- Review time: 1-7 business days

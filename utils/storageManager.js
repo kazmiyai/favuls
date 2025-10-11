@@ -37,6 +37,7 @@ function generateAllStorageKeys() {
         'startPageEnabled',
         'openInNewTab',
         'colorTheme',  // Color customization
+        'fontSettings',  // Font customization
         'urls',      // Legacy format
         'groups',    // Legacy format
         ...generateGroupKeys(),
@@ -63,6 +64,7 @@ async function loadDataFromStorage() {
                 startPageEnabled: result.startPageEnabled !== undefined ? result.startPageEnabled : true,
                 openInNewTab: result.openInNewTab !== undefined ? result.openInNewTab : true,
                 colorTheme: result.colorTheme || getDefaultColorTheme(),
+                fontSettings: result.fontSettings || getDefaultFontSettings(),
                 version: result.version,
                 lastUpdated: result.lastUpdated
             }
@@ -125,7 +127,8 @@ async function saveDataToStorage(groups, urls, metadata = {}) {
             dataModelVersion: metadata.dataModelVersion || '1.0',
             startPageEnabled: metadata.startPageEnabled !== undefined ? metadata.startPageEnabled : true,
             openInNewTab: metadata.openInNewTab !== undefined ? metadata.openInNewTab : true,
-            colorTheme: metadata.colorTheme || getDefaultColorTheme()
+            colorTheme: metadata.colorTheme || getDefaultColorTheme(),
+            fontSettings: metadata.fontSettings || getDefaultFontSettings()
         };
 
         // Convert data models to JSON if needed
@@ -307,6 +310,83 @@ async function resetColorTheme() {
     }
 }
 
+/**
+ * Gets the default font settings
+ * @returns {Object} Default font settings object
+ */
+function getDefaultFontSettings() {
+    return {
+        groupTitle: {
+            family: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            size: '16px',
+            color: '#333333'
+        },
+        urlItem: {
+            family: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            size: '14px',
+            color: '#333333'
+        }
+    };
+}
+
+/**
+ * Loads the font settings from storage
+ * @returns {Promise<Object>} Font settings object
+ */
+async function loadFontSettings() {
+    try {
+        const result = await chrome.storage.sync.get('fontSettings');
+        return result.fontSettings || getDefaultFontSettings();
+    } catch (error) {
+        console.error('Error loading font settings:', error);
+        return getDefaultFontSettings();
+    }
+}
+
+/**
+ * Saves the font settings to storage
+ * @param {Object} fontSettings - Font settings object
+ * @returns {Promise<void>}
+ */
+async function saveFontSettings(fontSettings) {
+    try {
+        // Validate font settings structure
+        const defaults = getDefaultFontSettings();
+        const validatedSettings = {
+            groupTitle: {
+                family: fontSettings.groupTitle?.family || defaults.groupTitle.family,
+                size: fontSettings.groupTitle?.size || defaults.groupTitle.size,
+                color: fontSettings.groupTitle?.color || defaults.groupTitle.color
+            },
+            urlItem: {
+                family: fontSettings.urlItem?.family || defaults.urlItem.family,
+                size: fontSettings.urlItem?.size || defaults.urlItem.size,
+                color: fontSettings.urlItem?.color || defaults.urlItem.color
+            }
+        };
+
+        await chrome.storage.sync.set({ fontSettings: validatedSettings });
+        console.log('Font settings saved successfully');
+    } catch (error) {
+        console.error('Error saving font settings:', error);
+        throw error;
+    }
+}
+
+/**
+ * Resets the font settings to defaults
+ * @returns {Promise<void>}
+ */
+async function resetFontSettings() {
+    try {
+        await saveFontSettings(getDefaultFontSettings());
+        console.log('Font settings reset to defaults');
+    } catch (error) {
+        console.error('Error resetting font settings:', error);
+        throw error;
+    }
+}
+
 // Export functions for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     // Node.js environment
@@ -322,7 +402,11 @@ if (typeof module !== 'undefined' && module.exports) {
         getDefaultColorTheme,
         loadColorTheme,
         saveColorTheme,
-        resetColorTheme
+        resetColorTheme,
+        getDefaultFontSettings,
+        loadFontSettings,
+        saveFontSettings,
+        resetFontSettings
     };
 } else if (typeof self !== 'undefined') {
     // Service Worker or Web Worker environment - attach to self (global scope)
@@ -338,7 +422,11 @@ if (typeof module !== 'undefined' && module.exports) {
         getDefaultColorTheme,
         loadColorTheme,
         saveColorTheme,
-        resetColorTheme
+        resetColorTheme,
+        getDefaultFontSettings,
+        loadFontSettings,
+        saveFontSettings,
+        resetFontSettings
     };
 } else if (typeof window !== 'undefined') {
     // Browser environment - attach to window
@@ -354,6 +442,10 @@ if (typeof module !== 'undefined' && module.exports) {
         getDefaultColorTheme,
         loadColorTheme,
         saveColorTheme,
-        resetColorTheme
+        resetColorTheme,
+        getDefaultFontSettings,
+        loadFontSettings,
+        saveFontSettings,
+        resetFontSettings
     };
 }

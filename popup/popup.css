@@ -1075,6 +1075,79 @@ body {
     text-transform: uppercase;
 }
 
+/* Font Settings Form Styles */
+.section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin: 16px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.section-title:first-child {
+    margin-top: 0;
+}
+
+.size-input-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-range-input {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #e0e0e0;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.form-range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4A90E2;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.form-range-input::-webkit-slider-thumb:hover {
+    background: #357ABD;
+    transform: scale(1.1);
+}
+
+.form-range-input::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4A90E2;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.form-range-input::-moz-range-thumb:hover {
+    background: #357ABD;
+    transform: scale(1.1);
+}
+
+.size-number-input {
+    width: 60px;
+    text-align: center;
+    padding: 6px 8px;
+}
+
+.size-unit {
+    font-size: 13px;
+    color: #666;
+    font-weight: 500;
+    min-width: 20px;
+}
+
 .color-preview {
     width: 24px;
     height: 24px;
