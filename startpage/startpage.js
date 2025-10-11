@@ -61,6 +61,9 @@ class StartPageApp {
 
             // Render the page
             this.render();
+
+            // Display version
+            this.displayVersion();
         } catch (error) {
             console.error('Failed to initialize start page:', error);
             this.showError('Failed to load bookmarks. Please try refreshing the page.');
@@ -551,6 +554,19 @@ class StartPageApp {
         document.documentElement.style.setProperty('--url-item-font-family', fontSettings.urlItem.family);
         document.documentElement.style.setProperty('--url-item-font-size', fontSettings.urlItem.size);
         document.documentElement.style.setProperty('--url-item-font-color', fontSettings.urlItem.color);
+    }
+
+    // Display version number from manifest
+    displayVersion() {
+        try {
+            const manifest = chrome.runtime.getManifest();
+            const versionElement = document.getElementById('startpageVersion');
+            if (versionElement && manifest.version) {
+                versionElement.textContent = `v${manifest.version}`;
+            }
+        } catch (error) {
+            console.error('Error displaying version:', error);
+        }
     }
 }
 

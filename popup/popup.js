@@ -38,6 +38,7 @@ class BookmarkManager {
         this.setupEventListeners();
         this.initializeToggle();
         this.renderURLs();
+        this.displayVersion();
     }
 
     // Initialize default group (Task 3.3: Enhanced with data models)
@@ -3558,6 +3559,19 @@ class BookmarkManager {
             this.applyColorTheme(colorTheme);
         } catch (error) {
             console.error('Error loading color theme:', error);
+        }
+    }
+
+    // Display version number from manifest
+    displayVersion() {
+        try {
+            const manifest = chrome.runtime.getManifest();
+            const versionElement = document.getElementById('popupVersion');
+            if (versionElement && manifest.version) {
+                versionElement.textContent = `v${manifest.version}`;
+            }
+        } catch (error) {
+            console.error('Error displaying version:', error);
         }
     }
 
