@@ -1451,3 +1451,134 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* Delete Group Warning Modal Styles */
+.warning-modal {
+    text-align: center;
+    padding: 24px;
+    max-width: 500px;
+}
+
+.warning-modal .warning-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.warning-modal .warning-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #d32f2f;
+    margin: 0 0 20px 0;
+}
+
+.warning-modal .warning-message {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.warning-modal .warning-main-text {
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.warning-modal .warning-danger-text {
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: #d32f2f;
+}
+
+.warning-modal .warning-danger-text strong {
+    font-weight: 700;
+}
+
+.warning-modal .warning-permanent {
+    font-size: 14px;
+    margin-top: 16px;
+    padding: 12px;
+    background-color: #fff3cd;
+    border-radius: 6px;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.url-preview-list {
+    max-height: 150px;
+    overflow-y: auto;
+    margin: 12px 0;
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: left;
+}
+
+.url-preview-list .url-preview-item {
+    padding: 4px 0;
+    border-bottom: 1px solid #e0e0e0;
+    color: #666;
+}
+
+.url-preview-list .url-preview-item:last-child {
+    border-bottom: none;
+}
+
+.warning-confirmation {
+    margin: 24px 0 16px 0;
+    text-align: left;
+}
+
+.warning-confirmation .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.warning-confirmation .checkbox-label input[type="checkbox"] {
+    margin-top: 2px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.warning-confirmation .checkbox-label span {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #333;
+}
+
+/* Danger Button Style */
+.btn-danger {
+    background-color: #d32f2f;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #b71c1c;
+}
+
+.btn-danger:active:not(:disabled) {
+    background-color: #9a0007;
+}
+
+.btn-danger:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-danger:focus {
+    outline: 2px solid #d32f2f;
+    outline-offset: 2px;
+}

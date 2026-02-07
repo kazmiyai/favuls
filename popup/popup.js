@@ -945,7 +945,7 @@ class BookmarkManager {
         return true;
     }
 
-    // Delete Group with confirmation
+    // Delete Group with enhanced warning confirmation
     async deleteGroup(groupId) {
         try {
             const group = this.groups.find(g => g.id === groupId);
@@ -964,34 +964,145 @@ class BookmarkManager {
             const urlsInGroup = this.urls.filter(u => u.groupId === groupId);
             const urlCount = urlsInGroup.length;
 
-            // Show confirmation dialog
-            const confirmMessage = urlCount > 0
-                ? `Are you sure you want to delete the group "${group.name}"? This will also delete ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} in this group.`
-                : `Are you sure you want to delete the group "${group.name}"?`;
+            // If group is empty, use simple confirmation
+            if (urlCount === 0) {
+                if (!confirm(`Are you sure you want to delete the group "${group.name}"?`)) {
+                    return;
+                }
 
-            if (!confirm(confirmMessage)) {
+                this.showLoading('Deleting group...');
+                this.groups = this.groups.filter(g => g.id !== groupId);
+                await this.saveData();
+                this.renderURLs();
+                this.showMessage(`Group "${group.name}" deleted successfully!`);
+                this.hideLoading();
                 return;
             }
 
-            this.showLoading('Deleting group...');
+            // Show enhanced warning modal for groups with bookmarks
+            this.openDeleteGroupWarningModal(group, urlsInGroup);
 
-            // Remove all URLs in this group
-            this.urls = this.urls.filter(u => u.groupId !== groupId);
-
-            // Remove the group
-            this.groups = this.groups.filter(g => g.id !== groupId);
-
-            // Save to storage
-            await this.saveData();
-
-            // Update UI
-            this.renderURLs();
-
-            // Show success message
-            this.showMessage(`Group "${group.name}" and ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} deleted successfully!`);
-
+        } catch (error) {
+            console.error('Error deleting group:', error);
+            this.showError(error.message || 'Failed to delete group');
             this.hideLoading();
+        }
+    }
 
+    // Open enhanced delete group warning modal
+    openDeleteGroupWarningModal(group, urlsInGroup) {
+        try {
+            const template = document.getElementById('deleteGroupWarningModalTemplate');
+            const footerTemplate = document.getElementById('deleteGroupWarningModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Delete group warning modal templates not found');
+                // Fallback to simple confirm
+                this.deleteGroupLegacy(group.id, urlsInGroup.length);
+                return;
+            }
+
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Populate modal with group information
+            modalBody.querySelector('#groupNameToDelete').textContent = group.name;
+            modalBody.querySelector('#urlCountToDelete').textContent = urlsInGroup.length;
+
+            // Show URL preview if 10 or fewer URLs
+            const urlListPreview = modalBody.querySelector('#urlListPreview');
+            if (urlsInGroup.length > 0 && urlsInGroup.length <= 10) {
+                urlListPreview.style.display = 'block';
+                urlsInGroup.forEach(url => {
+                    const urlItem = document.createElement('div');
+                    urlItem.className = 'url-preview-item';
+                    urlItem.textContent = url.title;
+                    urlListPreview.appendChild(urlItem);
+                });
+            }
+
+            // Set up event listeners
+            setTimeout(() => {
+                const checkbox = document.getElementById('confirmUnderstand');
+                const confirmBtn = document.getElementById('confirmDeleteGroup');
+                const cancelBtn = document.getElementById('cancelDeleteGroup');
+
+                if (!checkbox || !confirmBtn || !cancelBtn) {
+                    console.error('Modal elements not found');
+                    return;
+                }
+
+                // Enable/disable delete button based on checkbox
+                checkbox.addEventListener('change', () => {
+                    confirmBtn.disabled = !checkbox.checked;
+                });
+
+                // Handle cancel
+                cancelBtn.addEventListener('click', () => {
+                    this.closeModal();
+                });
+
+                // Handle confirm delete
+                confirmBtn.addEventListener('click', async () => {
+                    try {
+                        this.closeModal();
+                        this.showLoading('Deleting group...');
+
+                        // Remove all URLs in this group
+                        this.urls = this.urls.filter(u => u.groupId !== group.id);
+
+                        // Remove the group
+                        this.groups = this.groups.filter(g => g.id !== group.id);
+
+                        // Save to storage
+                        await this.saveData();
+
+                        // Update UI
+                        this.renderURLs();
+
+                        // Show success message
+                        this.showMessage(`Group "${group.name}" and ${urlsInGroup.length} bookmark${urlsInGroup.length !== 1 ? 's' : ''} deleted successfully!`);
+
+                        this.hideLoading();
+                    } catch (error) {
+                        console.error('Error deleting group:', error);
+                        this.showError(error.message || 'Failed to delete group');
+                        this.hideLoading();
+                    }
+                });
+            }, 100);
+
+            // Open modal
+            this.openModal('⚠️ Delete Group Warning', modalBody, modalFooter);
+
+        } catch (error) {
+            console.error('Error opening delete group warning modal:', error);
+            // Fallback to simple confirm
+            this.deleteGroupLegacy(group.id, urlsInGroup.length);
+        }
+    }
+
+    // Legacy delete group method (fallback)
+    async deleteGroupLegacy(groupId, urlCount) {
+        const group = this.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const confirmMessage = urlCount > 0
+            ? `Are you sure you want to delete the group "${group.name}"? This will also delete ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} in this group.`
+            : `Are you sure you want to delete the group "${group.name}"?`;
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            this.showLoading('Deleting group...');
+            this.urls = this.urls.filter(u => u.groupId !== groupId);
+            this.groups = this.groups.filter(g => g.id !== groupId);
+            await this.saveData();
+            this.renderURLs();
+            this.showMessage(`Group "${group.name}" and ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} deleted successfully!`);
+            this.hideLoading();
         } catch (error) {
             console.error('Error deleting group:', error);
             this.showError(error.message || 'Failed to delete group');
