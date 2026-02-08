@@ -1,6 +1,3 @@
-// Chrome Extension Popup JavaScript
-// Task 2.3: Current Tab URL Capture functionality
-// Task 2.4: In-Memory URL Display
 // Task 3.3: Complete Data Model Implementation
 
 class BookmarkManager {
@@ -1023,19 +1020,13 @@ class BookmarkManager {
 
             // Set up event listeners
             setTimeout(() => {
-                const checkbox = document.getElementById('confirmUnderstand');
                 const confirmBtn = document.getElementById('confirmDeleteGroup');
                 const cancelBtn = document.getElementById('cancelDeleteGroup');
 
-                if (!checkbox || !confirmBtn || !cancelBtn) {
-                    console.error('Modal elements not found');
+                if (!confirmBtn || !cancelBtn) {
+                    console.error('Modal elements not found for deletion warning');
                     return;
                 }
-
-                // Enable/disable delete button based on checkbox
-                checkbox.addEventListener('change', () => {
-                    confirmBtn.disabled = !checkbox.checked;
-                });
 
                 // Handle cancel
                 cancelBtn.addEventListener('click', () => {
@@ -1221,6 +1212,18 @@ class BookmarkManager {
             cancelBtn.addEventListener('click', () => this.closeModal());
         }
 
+        // Explicitly handle create button click for environments where form attribute might fail
+        const saveBtn = modalFooter.querySelector('#saveCreateGroup');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
+        }
+
         // Handle color picker preview
         const colorInput = modalBody.querySelector('#groupColor');
         const colorPreview = modalBody.querySelector('#colorPreview');
@@ -1377,6 +1380,18 @@ class BookmarkManager {
         const cancelBtn = modalFooter.querySelector('#cancelEditGroup');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Explicitly handle save button click
+        const saveBtn = modalFooter.querySelector('#saveEditGroup');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
         }
 
         // Handle real-time validation
@@ -1621,6 +1636,18 @@ class BookmarkManager {
             cancelBtn.addEventListener('click', () => this.closeModal());
         }
 
+        // Explicitly handle save button click
+        const saveBtn = modalFooter.querySelector('#saveAddURL');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
+        }
+
         // Handle real-time validation
         const urlInput = modalBody.querySelector('#urlAddress');
         const titleInput = modalBody.querySelector('#urlTitle');
@@ -1650,6 +1677,18 @@ class BookmarkManager {
         const cancelBtn = modalFooter.querySelector('#cancelEditURL');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Explicitly handle save button click
+        const saveBtn = modalFooter.querySelector('#saveEditURL');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
         }
 
         // Handle delete button

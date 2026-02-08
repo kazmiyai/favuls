@@ -930,8 +930,9 @@ body {
     border-radius: 8px;
     width: 90%;
     max-width: 360px;
-    max-height: 80%;
-    overflow: hidden;
+    max-height: 90%; /* Increased from 80% */
+    display: flex; /* Added to support flex layout for header/body/footer */
+    flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
@@ -966,7 +967,8 @@ body {
 
 .modal-body {
     padding: 20px;
-    max-height: 300px;
+    flex: 1; /* Allow to grow and shrink */
+    max-height: 400px; /* Increased from 300px */
     overflow-y: auto;
 }
 
