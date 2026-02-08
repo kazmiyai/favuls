@@ -14,7 +14,7 @@
   # 本番用ビルドの作成
   manifest.jsonのversionを更新
   
-  zip -r favurl-extension.zip . -x "favurl-extension.zip" "*.git*" "node_modules/*" "*.DS_Store" "CLAUDE.md" "debug.md" "todo.md" "how_to_submit_chrome_web_store.txt" ".gitignore" "test-*" "test_*"
+  zip -r favurl-extension.zip . -x "favurl-extension.zip" "*.git*" "node_modules/*" "*.DS_Store" "how_to_submit_chrome_web_store.txt" ".gitignore" "test-*" "test_*" "*.md"
 
   必須ファイル確認:
   - manifest.json (正しいバージョン、権限設定)

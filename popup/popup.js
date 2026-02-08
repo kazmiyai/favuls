@@ -1,6 +1,3 @@
-// Chrome Extension Popup JavaScript
-// Task 2.3: Current Tab URL Capture functionality
-// Task 2.4: In-Memory URL Display
 // Task 3.3: Complete Data Model Implementation
 
 class BookmarkManager {
@@ -945,7 +942,7 @@ class BookmarkManager {
         return true;
     }
 
-    // Delete Group with confirmation
+    // Delete Group with enhanced warning confirmation
     async deleteGroup(groupId) {
         try {
             const group = this.groups.find(g => g.id === groupId);
@@ -964,34 +961,139 @@ class BookmarkManager {
             const urlsInGroup = this.urls.filter(u => u.groupId === groupId);
             const urlCount = urlsInGroup.length;
 
-            // Show confirmation dialog
-            const confirmMessage = urlCount > 0
-                ? `Are you sure you want to delete the group "${group.name}"? This will also delete ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} in this group.`
-                : `Are you sure you want to delete the group "${group.name}"?`;
+            // If group is empty, use simple confirmation
+            if (urlCount === 0) {
+                if (!confirm(`Are you sure you want to delete the group "${group.name}"?`)) {
+                    return;
+                }
 
-            if (!confirm(confirmMessage)) {
+                this.showLoading('Deleting group...');
+                this.groups = this.groups.filter(g => g.id !== groupId);
+                await this.saveData();
+                this.renderURLs();
+                this.showMessage(`Group "${group.name}" deleted successfully!`);
+                this.hideLoading();
                 return;
             }
 
-            this.showLoading('Deleting group...');
+            // Show enhanced warning modal for groups with bookmarks
+            this.openDeleteGroupWarningModal(group, urlsInGroup);
 
-            // Remove all URLs in this group
-            this.urls = this.urls.filter(u => u.groupId !== groupId);
-
-            // Remove the group
-            this.groups = this.groups.filter(g => g.id !== groupId);
-
-            // Save to storage
-            await this.saveData();
-
-            // Update UI
-            this.renderURLs();
-
-            // Show success message
-            this.showMessage(`Group "${group.name}" and ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} deleted successfully!`);
-
+        } catch (error) {
+            console.error('Error deleting group:', error);
+            this.showError(error.message || 'Failed to delete group');
             this.hideLoading();
+        }
+    }
 
+    // Open enhanced delete group warning modal
+    openDeleteGroupWarningModal(group, urlsInGroup) {
+        try {
+            const template = document.getElementById('deleteGroupWarningModalTemplate');
+            const footerTemplate = document.getElementById('deleteGroupWarningModalFooterTemplate');
+
+            if (!template || !footerTemplate) {
+                console.error('Delete group warning modal templates not found');
+                // Fallback to simple confirm
+                this.deleteGroupLegacy(group.id, urlsInGroup.length);
+                return;
+            }
+
+            const modalBody = template.content.cloneNode(true);
+            const modalFooter = footerTemplate.content.cloneNode(true);
+
+            // Populate modal with group information
+            modalBody.querySelector('#groupNameToDelete').textContent = group.name;
+            modalBody.querySelector('#urlCountToDelete').textContent = urlsInGroup.length;
+
+            // Show URL preview if 10 or fewer URLs
+            const urlListPreview = modalBody.querySelector('#urlListPreview');
+            if (urlsInGroup.length > 0 && urlsInGroup.length <= 10) {
+                urlListPreview.style.display = 'block';
+                urlsInGroup.forEach(url => {
+                    const urlItem = document.createElement('div');
+                    urlItem.className = 'url-preview-item';
+                    urlItem.textContent = url.title;
+                    urlListPreview.appendChild(urlItem);
+                });
+            }
+
+            // Set up event listeners
+            setTimeout(() => {
+                const confirmBtn = document.getElementById('confirmDeleteGroup');
+                const cancelBtn = document.getElementById('cancelDeleteGroup');
+
+                if (!confirmBtn || !cancelBtn) {
+                    console.error('Modal elements not found for deletion warning');
+                    return;
+                }
+
+                // Handle cancel
+                cancelBtn.addEventListener('click', () => {
+                    this.closeModal();
+                });
+
+                // Handle confirm delete
+                confirmBtn.addEventListener('click', async () => {
+                    try {
+                        this.closeModal();
+                        this.showLoading('Deleting group...');
+
+                        // Remove all URLs in this group
+                        this.urls = this.urls.filter(u => u.groupId !== group.id);
+
+                        // Remove the group
+                        this.groups = this.groups.filter(g => g.id !== group.id);
+
+                        // Save to storage
+                        await this.saveData();
+
+                        // Update UI
+                        this.renderURLs();
+
+                        // Show success message
+                        this.showMessage(`Group "${group.name}" and ${urlsInGroup.length} bookmark${urlsInGroup.length !== 1 ? 's' : ''} deleted successfully!`);
+
+                        this.hideLoading();
+                    } catch (error) {
+                        console.error('Error deleting group:', error);
+                        this.showError(error.message || 'Failed to delete group');
+                        this.hideLoading();
+                    }
+                });
+            }, 100);
+
+            // Open modal
+            this.openModal('⚠️ Delete Group Warning', modalBody, modalFooter);
+
+        } catch (error) {
+            console.error('Error opening delete group warning modal:', error);
+            // Fallback to simple confirm
+            this.deleteGroupLegacy(group.id, urlsInGroup.length);
+        }
+    }
+
+    // Legacy delete group method (fallback)
+    async deleteGroupLegacy(groupId, urlCount) {
+        const group = this.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const confirmMessage = urlCount > 0
+            ? `Are you sure you want to delete the group "${group.name}"? This will also delete ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} in this group.`
+            : `Are you sure you want to delete the group "${group.name}"?`;
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            this.showLoading('Deleting group...');
+            this.urls = this.urls.filter(u => u.groupId !== groupId);
+            this.groups = this.groups.filter(g => g.id !== groupId);
+            await this.saveData();
+            this.renderURLs();
+            this.showMessage(`Group "${group.name}" and ${urlCount} bookmark${urlCount !== 1 ? 's' : ''} deleted successfully!`);
+            this.hideLoading();
         } catch (error) {
             console.error('Error deleting group:', error);
             this.showError(error.message || 'Failed to delete group');
@@ -1108,6 +1210,18 @@ class BookmarkManager {
         const cancelBtn = modalFooter.querySelector('#cancelCreateGroup');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Explicitly handle create button click for environments where form attribute might fail
+        const saveBtn = modalFooter.querySelector('#saveCreateGroup');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
         }
 
         // Handle color picker preview
@@ -1266,6 +1380,18 @@ class BookmarkManager {
         const cancelBtn = modalFooter.querySelector('#cancelEditGroup');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Explicitly handle save button click
+        const saveBtn = modalFooter.querySelector('#saveEditGroup');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
         }
 
         // Handle real-time validation
@@ -1510,6 +1636,18 @@ class BookmarkManager {
             cancelBtn.addEventListener('click', () => this.closeModal());
         }
 
+        // Explicitly handle save button click
+        const saveBtn = modalFooter.querySelector('#saveAddURL');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
+        }
+
         // Handle real-time validation
         const urlInput = modalBody.querySelector('#urlAddress');
         const titleInput = modalBody.querySelector('#urlTitle');
@@ -1539,6 +1677,18 @@ class BookmarkManager {
         const cancelBtn = modalFooter.querySelector('#cancelEditURL');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        // Explicitly handle save button click
+        const saveBtn = modalFooter.querySelector('#saveEditURL');
+        if (saveBtn && form) {
+            saveBtn.addEventListener('click', () => {
+                if (form.checkValidity()) {
+                    form.requestSubmit();
+                } else {
+                    form.reportValidity();
+                }
+            });
         }
 
         // Handle delete button
