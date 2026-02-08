@@ -597,8 +597,9 @@ class BookmarkManager {
         // Clear existing content
         urlList.innerHTML = '';
 
-        if (this.urls.length === 0) {
-            // Show empty state
+        // Show empty state only when there are no URLs and no custom groups
+        const hasCustomGroups = this.groups.some(g => g.id !== 'ungrouped');
+        if (this.urls.length === 0 && !hasCustomGroups) {
             if (emptyStateClone) {
                 urlList.appendChild(emptyStateClone);
             }
@@ -645,6 +646,12 @@ class BookmarkManager {
 
     groupURLsByGroup() {
         const grouped = {};
+
+        // Initialize all groups (including empty ones) so they are displayed
+        this.groups.forEach(group => {
+            grouped[group.id] = [];
+        });
+
         this.urls.forEach(url => {
             const groupId = url.groupId || 'ungrouped';
             if (!grouped[groupId]) {

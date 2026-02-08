@@ -217,7 +217,7 @@ class StartPageApp {
     filterData(searchTerm) {
         if (!searchTerm) {
             // No search term - show all data
-            this.filteredData.groups = this.groups.filter(group => group.urlCount > 0);
+            this.filteredData.groups = [...this.groups];
             this.filteredData.urls = this.urls;
             return;
         }
@@ -261,9 +261,7 @@ class StartPageApp {
         this.filteredData.groups.forEach(group => {
             const groupUrls = this.filteredData.urls.filter(url => url.groupId === group.id)
                 .sort((a, b) => (a.order || 0) - (b.order || 0));
-            if (groupUrls.length > 0) {
-                this.renderGroup(group, groupUrls);
-            }
+            this.renderGroup(group, groupUrls);
         });
     }
 
